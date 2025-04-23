@@ -34,13 +34,17 @@ class Book(Base):
     )
     genre: Mapped[str] = mapped_column(
         String(50),
+        nullable=True,
     )
     year: Mapped[int] = mapped_column(
         Integer,
+        nullable=True
     )
     isbn: Mapped[str] = mapped_column(
         String(20),
+        nullable=True,
     )
     description: Mapped[str] = mapped_column(
         Text,
+        nullable=True,
     )
