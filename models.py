@@ -1,4 +1,6 @@
-from sqlalchemy import create_engine, Integer, String, Text
+import datetime
+
+from sqlalchemy import create_engine, Integer, String, DateTime, func
 from sqlalchemy.orm import declarative_base, declared_attr, Mapped, mapped_column
 
 
@@ -44,7 +46,7 @@ class Book(Base):
         String(20),
         nullable=True,
     )
-    description: Mapped[str] = mapped_column(
-        Text,
-        nullable=True,
+    added_on: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        server_default=func.now()
     )

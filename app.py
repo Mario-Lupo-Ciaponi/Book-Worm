@@ -1,10 +1,10 @@
-from sqlalchemy import insert, select, column
+from sqlalchemy import insert, select, delete, column, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
 from tkinter import messagebox
 
 from models import engine, Book
-from exceptions import EmptyFieldError, NegativeYearError
+from exceptions import EmptyFieldError, NegativeYearError, BookDoesNotExistError
 
 Session = sessionmaker(bind=engine)
 
@@ -20,7 +20,6 @@ class Repo:
         genre: str,
         year: int=None,
         isbn: str=None,
-        description: str=None
     ):
         stmt = insert(Book).values(
             title=title,
@@ -28,7 +27,6 @@ class Repo:
             genre=genre,
             year=year,
             isbn=isbn,
-            description=description
         )
 
         self.session.execute(stmt)
@@ -41,6 +39,17 @@ class Repo:
 
         return result.scalars().all()
 
+    def get_book_by_title(self, title: str):
+        stmt = select(Book).where(Book.title == title).limit(1)
+        result = self.session.execute(stmt)
+
+        return result.scalars().first()
+
+    def delete_book_by_title(self, title: str):
+        stmt = delete(Book).where(Book.title == title)
+
+        self.session.execute(stmt)
+        self.session.commit()
 # ------ ^ Repo class
 
 
@@ -49,10 +58,18 @@ class BookWormApp(ctk.CTk):
         super().__init__()
 
         self.title("Book Worm")
-        self.geometry("500x500")
+
+        self.update_idletasks()
+        width = 500
+        height = 500
+
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+
+
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
         self.columnconfigure((0, 1, 2), weight=1)
-
 
         # Label that will show up at the top
         self.book_worm_label = ctk.CTkLabel(
@@ -141,6 +158,73 @@ class BookWormApp(ctk.CTk):
         )
 
         self.add_books_to_scrollable_frame()
+
+        self.entry_for_deleting = ctk.CTkEntry(
+            self,
+            width=220,
+            placeholder_text="Enter title of book here"
+        )
+        self.entry_for_deleting.grid(
+            row=5,
+            column=0,
+            columnspan=2,  # This spans the entry over two columns
+            pady=20,
+            padx=10,
+            sticky="e"
+        )
+
+        # Delete button positioned beside the entry
+        self.delete_button = ctk.CTkButton(
+            self,
+            text="Delete book",
+            command=self.delete_book
+        )
+        self.delete_button.grid(
+            row=5,
+            column=2,  # This puts it in the third column (adjacent to the entry field)
+            pady=20,
+            padx=10,
+            sticky="w"
+        )
+
+    @staticmethod
+    def check_if_book_exists_by_title(title: str):
+        with Session() as session:
+            repo = Repo(session)
+
+            books = repo.get_all_books()
+
+            titles = [b.title for b in books]
+
+            if title in titles:
+                return True
+
+            return False
+
+
+    def delete_book(self):
+        try:
+            title = self.entry_for_deleting.get()
+
+            if not title:
+                raise EmptyFieldError
+
+            if not self.check_if_book_exists_by_title(title):
+                raise BookDoesNotExistError
+        except EmptyFieldError:
+            messagebox.showerror("No Books Entered!", "The book title name field is empty!")
+        except BookDoesNotExistError:
+            messagebox.showerror("Book does not exist!", f'"{title}" does not exist!')
+        else:
+            with Session() as session:
+                repo = Repo(session)
+
+                repo.delete_book_by_title(title)
+                messagebox.showinfo("Successfully deleted book!",
+                                    f'"{title}" was deleted successfully from the library')
+                self.add_books_to_scrollable_frame()
+                self.entry_for_deleting.delete(first_index=0, last_index=len(title))
+
 
     def add_books_to_scrollable_frame(self):
         for book in self.scrollable_frame_books.winfo_children():

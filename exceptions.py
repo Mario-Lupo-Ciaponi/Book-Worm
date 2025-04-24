@@ -4,3 +4,6 @@ class EmptyFieldError(Exception):
 
 class NegativeYearError(Exception):
     pass
+
+class BookDoesNotExistError(Exception):
+    pass
