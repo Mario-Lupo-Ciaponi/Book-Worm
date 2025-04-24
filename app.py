@@ -1,8 +1,10 @@
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, column
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
+from tkinter import messagebox
 
 from models import engine, Book
+from exceptions import EmptyFieldError, NegativeYearError
 
 Session = sessionmaker(bind=engine)
 
@@ -38,6 +40,9 @@ class Repo:
         result = self.session.execute(stmt)
 
         return result.scalars().all()
+
+# ------ ^ Repo class
+
 
 class BookWormApp(ctk.CTk):
     def __init__(self):
@@ -100,7 +105,8 @@ class BookWormApp(ctk.CTk):
         self.add_book_button = ctk.CTkButton(
             self,
             text="+ Add book",
-            width=100
+            width=100,
+            command=self.open_add_book_window
         )
         self.add_book_button.grid(
             row=2,
@@ -155,6 +161,197 @@ class BookWormApp(ctk.CTk):
                          f"ISBN: {book.isbn}\n",
                 )
                 book_for_frame.pack()
+
+
+    def open_add_book_window(self):
+        def add_book():
+            title = entry_for_title.get()
+            author = entry_for_author.get()
+            genre = entry_for_genre.get()
+            year = entry_for_year.get()
+            isbn = entry_for_isbn.get()
+
+            try:
+                if not title or not author or not genre:
+                    raise EmptyFieldError
+
+                if year:
+                    year = int(year) # If it is not a number, it will throw a ValueError that will be caught
+
+                    if year < 0:
+                        raise NegativeYearError # The app does not support BC yet
+            except EmptyFieldError:
+                messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
+            except ValueError:
+                messagebox.showerror("Invalid Year Error!", "The year must be an integer number!")
+            except NegativeYearError:
+                messagebox.showerror("Negative Year Error!", "The year must be positive!")
+            else:
+                with Session() as session:
+                    repo = Repo(session)
+
+                    repo.add_book(
+                        title,
+                        author,
+                        genre,
+                        year if year else None,
+                        isbn if isbn else None
+                    )
+
+                    self.add_books_to_scrollable_frame()
+                    messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
+
+
+        add_book_window = ctk.CTkToplevel()
+        add_book_window.title("Add book to library")
+        add_book_window.geometry("440x400")
+
+        add_book_window.columnconfigure((0, 1), weight=1)
+
+        add_book_label = ctk.CTkLabel(
+            add_book_window,
+            text="Add New Book:",
+            font=("Helvetica", 20, "bold")
+        )
+        add_book_label.grid(
+            row=0,
+            column=0,
+            columnspan=2,
+            sticky="n",
+            pady=(20, 10)
+        )
+
+        title_label = ctk.CTkLabel(
+            add_book_window,
+            text="Title:"
+        )
+        title_label.grid(
+            row=1,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+        entry_for_title = ctk.CTkEntry(
+            add_book_window,
+        )
+        entry_for_title.grid(
+            row=1,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        author_label = ctk.CTkLabel(
+            add_book_window,
+            text="Author:"
+        )
+        author_label.grid(
+            row=2,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+        entry_for_author = ctk.CTkEntry(
+            add_book_window,
+        )
+        entry_for_author.grid(
+            row=2,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        genre_label = ctk.CTkLabel(
+            add_book_window,
+            text="Genre:"
+        )
+        genre_label.grid(
+            row=3,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+        entry_for_genre = ctk.CTkEntry(
+            add_book_window,
+        )
+        entry_for_genre.grid(
+            row=3,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        year_label = ctk.CTkLabel(
+            add_book_window,
+            text="Year:"
+        )
+        year_label.grid(
+            row=4,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+        entry_for_year = ctk.CTkEntry(
+            add_book_window,
+            placeholder_text="Optional"
+        )
+        entry_for_year.grid(
+            row=4,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        isbn_label = ctk.CTkLabel(
+            add_book_window,
+            text="ISBN:"
+        )
+        isbn_label.grid(
+            row=5,
+            column=0,
+            padx=10,
+            pady=10,
+            sticky="e"
+        )
+
+        entry_for_isbn = ctk.CTkEntry(
+            add_book_window,
+            placeholder_text="Optional"
+        )
+        entry_for_isbn.grid(
+            row=5,
+            column=1,
+            padx=10,
+            pady=10,
+            sticky="w"
+        )
+
+        add_book_button = ctk.CTkButton(
+            add_book_window,
+            text="Add book",
+            command=add_book
+        )
+        add_book_button.grid(
+            row=6,
+            column=0,
+            columnspan=2,
+            pady=20,
+            sticky="s"
+        )
+
+        add_book_window.mainloop()
 
 
 
