@@ -57,6 +57,18 @@ class Repo:
 
         return result.scalars().all()
 
+    def order_by_title(self, ascending):
+        stmt = select(Book).order_by(Book.title.asc()) if ascending else select(Book).order_by(Book.title.desc())
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def order_by_author(self, ascending):
+        stmt = select(Book).order_by(Book.author.asc()) if ascending else select(Book).order_by(Book.author.desc())
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
     def delete_book_by_title(self, title: str):
         stmt = delete(Book).where(Book.title == title)
 
@@ -182,7 +194,7 @@ class BookWormApp(ctk.CTk):
         self.option_value = ctk.StringVar(value="Year(Latest)")
         self.combo_box_for_order = ctk.CTkComboBox(
             self,
-            values=["Year(Latest)", "Year(Earliest)" "Title(A-Z)", "Title(Z-A)", "Author(A-Z)", "Author(Z-A)"],
+            values=["Year(Latest)", "Year(Earliest)", "Title(A-Z)", "Title(Z-A)", "Author(A-Z)", "Author(Z-A)"],
             variable=self.option_value
         )
         self.combo_box_for_order.grid(
@@ -254,7 +266,11 @@ class BookWormApp(ctk.CTk):
             order_option = self.option_value.get()
 
             if "Year" in order_option:
-                books = repo.order_by_year(True if "A-Z" in order_option else False)
+                books = repo.order_by_year(True if "Earliest" in order_option else False)
+            elif "Title" in order_option:
+                books = repo.order_by_title(True if "A-Z" in order_option else False)
+            elif "Author" in order_option:
+                books = repo.order_by_author(True if "A-Z" in order_option else False)
 
             self.add_books_to_scrollable_frame(books)
 
