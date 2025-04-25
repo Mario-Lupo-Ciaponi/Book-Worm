@@ -51,6 +51,11 @@ class Repo:
 
         return result.scalars().all()
 
+    def order_by_year(self, ascending):
+        stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
 
     def delete_book_by_title(self, title: str):
         stmt = delete(Book).where(Book.title == title)
@@ -68,7 +73,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 500
+        height = 600
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -166,7 +171,39 @@ class BookWormApp(ctk.CTk):
             pady=(20, 5)
         )
 
-        self.add_books_to_scrollable_frame()
+        with Session() as session:
+            repo = Repo(session)
+
+            books = repo.get_all_books()
+
+            self.add_books_to_scrollable_frame(books)
+
+
+        self.option_value = ctk.StringVar(value="Year(Latest)")
+        self.combo_box_for_order = ctk.CTkComboBox(
+            self,
+            values=["Year(Latest)", "Year(Earliest)" "Title(A-Z)", "Title(Z-A)", "Author(A-Z)", "Author(Z-A)"],
+            variable=self.option_value
+        )
+        self.combo_box_for_order.grid(
+            row=5,
+            column=1,
+            sticky="e",
+            padx=20
+        )
+
+        self.order_by_button = ctk.CTkButton(
+            self,
+            text="Order by",
+            width=100,
+            command=self.order_in_frame
+        )
+        self.order_by_button.grid(
+            row=5,
+            column=2,
+            pady=20,
+            sticky="w"
+        )
 
         self.entry_for_deleting = ctk.CTkEntry(
             self,
@@ -174,7 +211,7 @@ class BookWormApp(ctk.CTk):
             placeholder_text="Enter title of book here"
         )
         self.entry_for_deleting.grid(
-            row=5,
+            row=6,
             column=0,
             columnspan=2,  # This spans the entry over two columns
             pady=20,
@@ -189,7 +226,7 @@ class BookWormApp(ctk.CTk):
             command=self.delete_book
         )
         self.delete_button.grid(
-            row=5,
+            row=6,
             column=2,  # This puts it in the third column (adjacent to the entry field)
             pady=20,
             padx=10,
@@ -209,6 +246,17 @@ class BookWormApp(ctk.CTk):
                 return True
 
             return False
+
+    def order_in_frame(self):
+        with Session() as session:
+            repo = Repo(session)
+            books = ""
+            order_option = self.option_value.get()
+
+            if "Year" in order_option:
+                books = repo.order_by_year(True if "A-Z" in order_option else False)
+
+            self.add_books_to_scrollable_frame(books)
 
 
     def delete_book(self):
@@ -231,7 +279,10 @@ class BookWormApp(ctk.CTk):
                 repo.delete_book_by_title(title)
                 messagebox.showinfo("Successfully deleted book!",
                                     f'"{title}" was deleted successfully from the library')
-                self.add_books_to_scrollable_frame()
+
+                books = repo.get_all_books()
+
+                self.add_books_to_scrollable_frame(books)
                 self.entry_for_deleting.delete(first_index=0, last_index=len(title))
 
     def remove_book_from_scrollable_frame(self):
@@ -259,40 +310,24 @@ class BookWormApp(ctk.CTk):
 
                 books = repo.get_books_by_title(title)
 
-                for book in books:
-                    searched_book = ctk.CTkLabel(
-                        self.scrollable_frame_books,
-                        text=f"Title: {book.title};\n"
-                             f"Author: {book.author};\n"
-                             f"Genre: {book.genre};\n"
-                             f"Year: {book.year};\n"
-                             f"ISBN: {book.isbn}\n"
-                             f"Added on: {book.added_on}",
-
-                    )
-                    searched_book.pack(pady=10)
+                self.add_books_to_scrollable_frame(books)
 
 
-    def add_books_to_scrollable_frame(self):
+    def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
 
-        with Session() as session:
-            repo = Repo(session)
+        for book in books:
+            book_for_frame = ctk.CTkLabel(
+                self.scrollable_frame_books,
+                text=f"Title: {book.title};\n"
+                     f"Author: {book.author};\n"
+                     f"Genre: {book.genre};\n"
+                     f"Year: {book.year};\n"
+                     f"ISBN: {book.isbn}\n"
+                     f"Added on: {book.added_on}",
 
-            books = repo.get_all_books()
-
-            for book in books:
-                book_for_frame = ctk.CTkLabel(
-                    self.scrollable_frame_books,
-                    text=f"Title: {book.title};\n"
-                         f"Author: {book.author};\n"
-                         f"Genre: {book.genre};\n"
-                         f"Year: {book.year};\n"
-                         f"ISBN: {book.isbn}\n"
-                         f"Added on: {book.added_on}",
-
-                )
-                book_for_frame.pack(pady=10)
+            )
+            book_for_frame.pack(pady=10)
 
 
     def open_add_book_window(self):
@@ -330,7 +365,9 @@ class BookWormApp(ctk.CTk):
                         isbn if isbn else None
                     )
 
-                    self.add_books_to_scrollable_frame()
+                    books = repo.get_all_books()
+
+                    self.add_books_to_scrollable_frame(books)
                     messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
 
 
