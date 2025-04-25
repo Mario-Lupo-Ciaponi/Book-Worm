@@ -45,6 +45,13 @@ class Repo:
 
         return result.scalars().first()
 
+    def get_books_by_title(self, title: str):
+        stmt = select(Book).where(Book.title == title)
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+
     def delete_book_by_title(self, title: str):
         stmt = delete(Book).where(Book.title == title)
 
@@ -98,6 +105,7 @@ class BookWormApp(ctk.CTk):
 
         self.search_entry = ctk.CTkEntry(
             self,
+            placeholder_text="Enter Title of Book here"
         )
         self.search_entry.grid(
             row=1,
@@ -109,14 +117,15 @@ class BookWormApp(ctk.CTk):
 
         self.button_for_search = ctk.CTkButton(
             self,
-            text="Search"
+            text="Search",
+            command=self.search_book
         )
         self.button_for_search.grid(
             row=1,
             column=2,
             padx=10,
             pady=10,
-            sticky="w"
+            sticky="w",
         )
 
         self.add_book_button = ctk.CTkButton(
@@ -225,10 +234,47 @@ class BookWormApp(ctk.CTk):
                 self.add_books_to_scrollable_frame()
                 self.entry_for_deleting.delete(first_index=0, last_index=len(title))
 
-
-    def add_books_to_scrollable_frame(self):
+    def remove_book_from_scrollable_frame(self):
         for book in self.scrollable_frame_books.winfo_children():
             book.destroy()
+
+    def search_book(self):
+        try:
+            title = self.search_entry.get().strip()
+
+            if not title:
+                raise EmptyFieldError
+            if not self.check_if_book_exists_by_title(title):
+                messagebox.showerror("No book found!", f'"{title}" was not found!')
+                raise BookDoesNotExistError
+        except EmptyFieldError:
+            messagebox.showerror("Empty field!", "The search field must not be empty!")
+        except BookDoesNotExistError:
+            messagebox.showerror("Book does not exist!", f'"{title}" does not exist in the library!')
+        else:
+            with Session() as session:
+                repo = Repo(session)
+
+                self.remove_book_from_scrollable_frame()
+
+                books = repo.get_books_by_title(title)
+
+                for book in books:
+                    searched_book = ctk.CTkLabel(
+                        self.scrollable_frame_books,
+                        text=f"Title: {book.title};\n"
+                             f"Author: {book.author};\n"
+                             f"Genre: {book.genre};\n"
+                             f"Year: {book.year};\n"
+                             f"ISBN: {book.isbn}\n"
+                             f"Added on: {book.added_on}",
+
+                    )
+                    searched_book.pack(pady=10)
+
+
+    def add_books_to_scrollable_frame(self):
+        self.remove_book_from_scrollable_frame()
 
         with Session() as session:
             repo = Repo(session)
@@ -242,9 +288,11 @@ class BookWormApp(ctk.CTk):
                          f"Author: {book.author};\n"
                          f"Genre: {book.genre};\n"
                          f"Year: {book.year};\n"
-                         f"ISBN: {book.isbn}\n",
+                         f"ISBN: {book.isbn}\n"
+                         f"Added on: {book.added_on}",
+
                 )
-                book_for_frame.pack()
+                book_for_frame.pack(pady=10)
 
 
     def open_add_book_window(self):
