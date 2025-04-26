@@ -45,6 +45,7 @@ class Book(Base):
     isbn: Mapped[str] = mapped_column(
         String(20),
         nullable=True,
+        unique=True,
     )
     added_on: Mapped[datetime.datetime] = mapped_column(
         DateTime,

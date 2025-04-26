@@ -1,4 +1,5 @@
-from sqlalchemy import insert, select, delete, column, func
+import sqlalchemy.exc
+from sqlalchemy import insert, select, delete, update, column, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
 from tkinter import messagebox
@@ -75,11 +76,26 @@ class Repo:
 
         return result.scalars().all()
 
+    def update_book(self, old_title, new_title, new_author, new_genre, new_year, new_isbn):
+        stmt = (update(Book)
+                .where(Book.title == old_title)
+                .values(
+                    title=new_title if new_title else Book.title,
+                    author=new_author if new_author else Book.author,
+                    genre=new_genre if new_genre else Book.genre,
+                    year=new_year if new_year else Book.year,
+                    isbn=new_isbn if new_isbn else Book.isbn
+        ))
+        self.session.execute(stmt)
+        self.session.commit()
+
+
     def delete_book_by_title(self, title: str):
         stmt = delete(Book).where(Book.title == title)
 
         self.session.execute(stmt)
         self.session.commit()
+
 # ------ ^ Repo class
 
 
@@ -303,14 +319,45 @@ class BookWormApp(ctk.CTk):
 
                 messagebox.showinfo("Successful deletion!", f'"{title}" was deleted successfully!')
 
-
     def edit_book(self, title_of_book):
+        def update_book():
+            new_title = title_entry.get().strip()
+            new_author = author_entry.get().strip()
+            new_genre = genre_entry.get().strip()
+            new_year = year_entry.get().strip()
+            new_isbn = isbn_entry.get().strip()
+
+            try:
+                if new_year:
+                    new_year = int(new_year)
+
+                    if new_year < 0:
+                        raise NegativeYearError
+
+                with Session() as session:
+                    repo = Repo(session)
+
+                    repo.update_book(title_of_book, new_title, new_author, new_genre, new_year, new_isbn)
+
+                    books = repo.get_all_books()
+
+                    self.add_books_to_scrollable_frame(books)
+                    messagebox.showinfo("Successful update!", "The book was successfully updated!")
+            except ValueError or NegativeYearError:
+                messagebox.showerror("Invalid year!", "Year must be a positive integer number!")
+            except sqlalchemy.exc.IntegrityError:
+                messagebox.showerror("ISBN already used", f"{new_isbn} is already used!")
+
+
         edit_window = ctk.CTkToplevel()
 
         edit_window.title(f'Edit "{title_of_book}"')
         edit_window.geometry("400x400")
 
         edit_window.columnconfigure((0, 1), weight=1)
+
+        place_holder_text = "leave blank if no edit is needed"
+        width_of_entries = 220
 
         # Label that will show up at the top
         edit_label = ctk.CTkLabel(
@@ -321,11 +368,142 @@ class BookWormApp(ctk.CTk):
         edit_label.grid(
             row=0,
             column=0,
-            columnspan=3,
+            columnspan=2,
             sticky="n",
             pady=(20, 10))
 
+        title_label = ctk.CTkLabel(
+            edit_window,
+            text="Title:"
+        )
+        title_label.grid(
+            row=1,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
 
+        title_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        title_entry.grid(
+            row=1,
+            column=1,
+            sticky="w"
+        )
+
+        author_label = ctk.CTkLabel(
+            edit_window,
+            text="Author:"
+        )
+        author_label.grid(
+            row=2,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        author_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        author_entry.grid(
+            row=2,
+            column=1,
+            sticky="w"
+        )
+
+        genre_label = ctk.CTkLabel(
+            edit_window,
+            text="Genre:"
+        )
+        genre_label.grid(
+            row=3,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        genre_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        genre_entry.grid(
+            row=3,
+            column=1,
+            sticky="w"
+        )
+
+        year_label = ctk.CTkLabel(
+            edit_window,
+            text="Year:"
+        )
+        year_label.grid(
+            row=4,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        year_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        year_entry.grid(
+            row=4,
+            column=1,
+            sticky="w"
+        )
+
+        isbn_label = ctk.CTkLabel(
+            edit_window,
+            text="ISBN:"
+        )
+        isbn_label.grid(
+            row=5,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        isbn_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        isbn_entry.grid(
+            row=5,
+            column=1,
+            sticky="w"
+        )
+
+        edit_button = ctk.CTkButton(
+            edit_window,
+            command=update_book,
+            text="Edit"
+        )
+        edit_button.grid(
+            row=6,
+            column=0,
+            columnspan=2,
+            pady=20,
+            sticky="s"
+        )
 
 
     def add_books_to_scrollable_frame(self, books: Book):
@@ -364,11 +542,11 @@ class BookWormApp(ctk.CTk):
 
     def open_add_book_window(self):
         def add_book():
-            title = entry_for_title.get()
-            author = entry_for_author.get()
-            genre = entry_for_genre.get()
-            year = entry_for_year.get()
-            isbn = entry_for_isbn.get()
+            title = entry_for_title.get().strip()
+            author = entry_for_author.get().strip()
+            genre = entry_for_genre.get().strip()
+            year = entry_for_year.get().strip()
+            isbn = entry_for_isbn.get().strip()
 
             try:
                 if not title or not author or not genre:
@@ -379,13 +557,7 @@ class BookWormApp(ctk.CTk):
 
                     if year < 0:
                         raise NegativeYearError # The app does not support BC yet
-            except EmptyFieldError:
-                messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
-            except ValueError:
-                messagebox.showerror("Invalid Year Error!", "The year must be an integer number!")
-            except NegativeYearError:
-                messagebox.showerror("Negative Year Error!", "The year must be positive!")
-            else:
+
                 with Session() as session:
                     repo = Repo(session)
 
@@ -401,7 +573,14 @@ class BookWormApp(ctk.CTk):
 
                     self.add_books_to_scrollable_frame(books)
                     messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
-
+            except EmptyFieldError:
+                messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
+            except ValueError:
+                messagebox.showerror("Invalid Year Error!", "The year must be an integer number!")
+            except NegativeYearError:
+                messagebox.showerror("Negative Year Error!", "The year must be positive!")
+            except sqlalchemy.exc.IntegrityError:
+                messagebox.showerror("ISBN already used!", f"{isbn} ISBN is already used!")
 
         add_book_window = ctk.CTkToplevel()
         add_book_window.title("Add book to library")
@@ -551,9 +730,6 @@ class BookWormApp(ctk.CTk):
             pady=20,
             sticky="s"
         )
-
-        add_book_window.mainloop()
-
 
 
 def main():
