@@ -69,6 +69,12 @@ class Repo:
 
         return result.scalars().all()
 
+    def order_by_added_on(self, ascending):
+        stmt = select(Book).order_by(Book.added_on.asc()) if ascending else select(Book).order_by(Book.added_on.desc())
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
     def delete_book_by_title(self, title: str):
         stmt = delete(Book).where(Book.title == title)
 
@@ -85,7 +91,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 600
+        height = 520
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -191,11 +197,15 @@ class BookWormApp(ctk.CTk):
             self.add_books_to_scrollable_frame(books)
 
 
-        self.option_value = ctk.StringVar(value="Year(Latest)")
+        self.option_value = ctk.StringVar(value="Title(A-Z)")
         self.combo_box_for_order = ctk.CTkComboBox(
             self,
-            values=["Year(Latest)", "Year(Earliest)", "Title(A-Z)", "Title(Z-A)", "Author(A-Z)", "Author(Z-A)"],
-            variable=self.option_value
+            values=["Title(A-Z)", "Title(Z-A)",
+                    "Author(A-Z)", "Author(Z-A)",
+                    "Year(Latest)", "Year(Earliest)",
+                    "Added on(Latest)", "Added on(Earliest)"],
+            variable=self.option_value,
+            width=160,
         )
         self.combo_box_for_order.grid(
             row=5,
@@ -217,33 +227,6 @@ class BookWormApp(ctk.CTk):
             sticky="w"
         )
 
-        self.entry_for_deleting = ctk.CTkEntry(
-            self,
-            width=220,
-            placeholder_text="Enter title of book here"
-        )
-        self.entry_for_deleting.grid(
-            row=6,
-            column=0,
-            columnspan=2,  # This spans the entry over two columns
-            pady=20,
-            padx=10,
-            sticky="e"
-        )
-
-        # Delete button positioned beside the entry
-        self.delete_button = ctk.CTkButton(
-            self,
-            text="Delete book",
-            command=self.delete_book
-        )
-        self.delete_button.grid(
-            row=6,
-            column=2,  # This puts it in the third column (adjacent to the entry field)
-            pady=20,
-            padx=10,
-            sticky="w"
-        )
 
     @staticmethod
     def check_if_book_exists_by_title(title: str):
@@ -265,41 +248,19 @@ class BookWormApp(ctk.CTk):
             books = ""
             order_option = self.option_value.get()
 
-            if "Year" in order_option:
-                books = repo.order_by_year(True if "Earliest" in order_option else False)
-            elif "Title" in order_option:
+            if "Title" in order_option:
                 books = repo.order_by_title(True if "A-Z" in order_option else False)
             elif "Author" in order_option:
                 books = repo.order_by_author(True if "A-Z" in order_option else False)
+            elif "Year" in order_option:
+                books = repo.order_by_year(True if "Earliest" in order_option else False)
+            elif "Added on" in order_option:
+                books = repo.order_by_added_on(True if "Earliest" in order_option else False)
+            else:
+                messagebox.showerror("Invalid option!", "Invalid order option!")
+                return
 
             self.add_books_to_scrollable_frame(books)
-
-
-    def delete_book(self):
-        try:
-            title = self.entry_for_deleting.get()
-
-            if not title:
-                raise EmptyFieldError
-
-            if not self.check_if_book_exists_by_title(title):
-                raise BookDoesNotExistError
-        except EmptyFieldError:
-            messagebox.showerror("No Books Entered!", "The book title name field is empty!")
-        except BookDoesNotExistError:
-            messagebox.showerror("Book does not exist!", f'"{title}" does not exist!')
-        else:
-            with Session() as session:
-                repo = Repo(session)
-
-                repo.delete_book_by_title(title)
-                messagebox.showinfo("Successfully deleted book!",
-                                    f'"{title}" was deleted successfully from the library')
-
-                books = repo.get_all_books()
-
-                self.add_books_to_scrollable_frame(books)
-                self.entry_for_deleting.delete(first_index=0, last_index=len(title))
 
     def remove_book_from_scrollable_frame(self):
         for book in self.scrollable_frame_books.winfo_children():
@@ -328,6 +289,44 @@ class BookWormApp(ctk.CTk):
 
                 self.add_books_to_scrollable_frame(books)
 
+    def delete_book(self, title: str):
+        user_answer = messagebox.askyesno("Are you sure?", f'Are you sure you want to delete "{title}"?')
+
+        if user_answer:
+            with Session() as session:
+                repo = Repo(session)
+
+                repo.delete_book_by_title(title)
+                books = repo.get_all_books()
+
+                self.add_books_to_scrollable_frame(books)
+
+                messagebox.showinfo("Successful deletion!", f'"{title}" was deleted successfully!')
+
+
+    def edit_book(self, title_of_book):
+        edit_window = ctk.CTkToplevel()
+
+        edit_window.title(f'Edit "{title_of_book}"')
+        edit_window.geometry("400x400")
+
+        edit_window.columnconfigure((0, 1), weight=1)
+
+        # Label that will show up at the top
+        edit_label = ctk.CTkLabel(
+            edit_window,
+            text=f'Edit - "{title_of_book}"',
+            font=("Helvetica", 20, "bold")
+        )
+        edit_label.grid(
+            row=0,
+            column=0,
+            columnspan=3,
+            sticky="n",
+            pady=(20, 10))
+
+
+
 
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
@@ -343,7 +342,24 @@ class BookWormApp(ctk.CTk):
                      f"Added on: {book.added_on}",
 
             )
-            book_for_frame.pack(pady=10)
+            book_for_frame.pack(pady=(20, 5))
+
+            edit_button = ctk.CTkButton(
+                self.scrollable_frame_books,
+                command=lambda b=book: self.edit_book(b.title),
+                text="Edit",
+                width=60
+            )
+            edit_button.pack(pady=5)
+
+            delete_button = ctk.CTkButton(
+                self.scrollable_frame_books,
+                command=lambda b=book: self.delete_book(b.title),
+                text="Delete",
+                width=60,
+                fg_color="red"
+            )
+            delete_button.pack(pady=(5, 0))
 
 
     def open_add_book_window(self):
