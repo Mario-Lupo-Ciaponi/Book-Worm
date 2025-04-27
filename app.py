@@ -19,6 +19,7 @@ class Repo:
         title: str,
         author: str,
         genre: str,
+        description: str,
         year: int=None,
         isbn: str=None,
     ):
@@ -26,6 +27,7 @@ class Repo:
             title=title,
             author=author,
             genre=genre,
+            description=description,
             year=year,
             isbn=isbn,
         )
@@ -86,6 +88,11 @@ class Repo:
                     year=new_year if new_year else Book.year,
                     isbn=new_isbn if new_isbn else Book.isbn
         ))
+        self.session.execute(stmt)
+        self.session.commit()
+
+    def update_book_read_status(self, book):
+        stmt = update(Book).where(Book.id == book.id).values(is_read=True if not book.is_read else False)
         self.session.execute(stmt)
         self.session.commit()
 
@@ -261,7 +268,6 @@ class BookWormApp(ctk.CTk):
     def order_in_frame(self):
         with Session() as session:
             repo = Repo(session)
-            books = ""
             order_option = self.option_value.get()
 
             if "Title" in order_option:
@@ -505,6 +511,13 @@ class BookWormApp(ctk.CTk):
             sticky="s"
         )
 
+    def change_book_read_status(self, book):
+        with Session() as session:
+            repo = Repo(session)
+            repo.update_book_read_status(book)
+
+            books = repo.get_all_books()
+            self.add_books_to_scrollable_frame(books)
 
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
@@ -521,6 +534,17 @@ class BookWormApp(ctk.CTk):
 
             )
             book_for_frame.pack(pady=(20, 5))
+
+            is_read_value = ctk.BooleanVar(value=book.is_read)
+            is_read_checkbox = ctk.CTkCheckBox(
+                self.scrollable_frame_books,
+                text="Read",
+                command=lambda b=book: self.change_book_read_status(b),
+                variable=is_read_value,
+                onvalue=True,
+                offvalue=False,
+            )
+            is_read_checkbox.pack(pady=10)
 
             edit_button = ctk.CTkButton(
                 self.scrollable_frame_books,

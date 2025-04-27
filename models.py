@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import create_engine, Integer, String, DateTime, func
+from sqlalchemy import create_engine, Integer, String, Text, Boolean, DateTime, func
 from sqlalchemy.orm import declarative_base, declared_attr, Mapped, mapped_column
 
 
@@ -42,10 +42,19 @@ class Book(Base):
         Integer,
         nullable=True
     )
+    description: Mapped[str] = mapped_column(
+        Text,
+        nullable=True,
+    )
     isbn: Mapped[str] = mapped_column(
         String(20),
         nullable=True,
         unique=True,
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
     )
     added_on: Mapped[datetime.datetime] = mapped_column(
         DateTime,
