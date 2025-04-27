@@ -1,4 +1,5 @@
 import sqlalchemy.exc
+from docutils.nodes import description
 from sqlalchemy import insert, select, delete, update, column, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
@@ -19,7 +20,7 @@ class Repo:
         title: str,
         author: str,
         genre: str,
-        description: str,
+        description: str=None,
         year: int=None,
         isbn: str=None,
     ):
@@ -53,6 +54,22 @@ class Repo:
         result = self.session.execute(stmt)
 
         return result.scalars().all()
+
+    def get_books_count(self):
+        stmt = select(func.count(Book.id))
+
+        count = self.session.scalar(stmt)
+        return count
+
+    def get_read_and_unread_count(self):
+        read_count_stmt = select(func.count(Book.id)).where(Book.is_read==True)
+        unread_count_stmt = select(func.count(Book.id)).where(Book.is_read == False)
+
+        read_count = self.session.scalar(read_count_stmt)
+        unread_count = self.session.scalar(unread_count_stmt)
+
+        return read_count, unread_count
+
 
     def order_by_year(self, ascending):
         stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
@@ -114,7 +131,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 520
+        height = 550
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -216,9 +233,31 @@ class BookWormApp(ctk.CTk):
             repo = Repo(session)
 
             books = repo.get_all_books()
+            count_of_books = repo.get_books_count()
 
             self.add_books_to_scrollable_frame(books)
 
+        # self.label_for_total_books = ctk.CTkLabel(
+        #     self,
+        #     text=f"Book's count: {count_of_books}"
+        # )
+        #
+        # self.label_for_total_books.grid(
+        #     row=5,
+        #     column=2
+        # )
+
+        self.statistics_button = ctk.CTkButton(
+            self,
+            text="Statistics",
+            command=self.open_statistics_window,
+            width=100
+        )
+        self.statistics_button.grid(
+            row=5,
+            column=2,
+            pady=10
+        )
 
         self.option_value = ctk.StringVar(value="Title(A-Z)")
         self.combo_box_for_order = ctk.CTkComboBox(
@@ -231,7 +270,7 @@ class BookWormApp(ctk.CTk):
             width=160,
         )
         self.combo_box_for_order.grid(
-            row=5,
+            row=6,
             column=1,
             sticky="e",
             padx=20
@@ -244,7 +283,7 @@ class BookWormApp(ctk.CTk):
             command=self.order_in_frame
         )
         self.order_by_button.grid(
-            row=5,
+            row=6,
             column=2,
             pady=20,
             sticky="w"
@@ -561,7 +600,7 @@ class BookWormApp(ctk.CTk):
                 width=60,
                 fg_color="red"
             )
-            delete_button.pack(pady=(5, 0))
+            delete_button.pack(pady=(5, 15))
 
 
     def open_add_book_window(self):
@@ -608,9 +647,18 @@ class BookWormApp(ctk.CTk):
 
         add_book_window = ctk.CTkToplevel()
         add_book_window.title("Add book to library")
-        add_book_window.geometry("440x400")
+
+        width = 440
+        height = 420
+
+        x = 25
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+
+        add_book_window.geometry(f"{width}x{height}+{x}+{y}")
 
         add_book_window.columnconfigure((0, 1), weight=1)
+
+        padding = 10
 
         add_book_label = ctk.CTkLabel(
             add_book_window,
@@ -632,8 +680,8 @@ class BookWormApp(ctk.CTk):
         title_label.grid(
             row=1,
             column=0,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="e"
         )
 
@@ -643,8 +691,8 @@ class BookWormApp(ctk.CTk):
         entry_for_title.grid(
             row=1,
             column=1,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="w"
         )
 
@@ -655,8 +703,8 @@ class BookWormApp(ctk.CTk):
         author_label.grid(
             row=2,
             column=0,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="e"
         )
 
@@ -666,8 +714,8 @@ class BookWormApp(ctk.CTk):
         entry_for_author.grid(
             row=2,
             column=1,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="w"
         )
 
@@ -678,8 +726,8 @@ class BookWormApp(ctk.CTk):
         genre_label.grid(
             row=3,
             column=0,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="e"
         )
 
@@ -689,8 +737,32 @@ class BookWormApp(ctk.CTk):
         entry_for_genre.grid(
             row=3,
             column=1,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
+            sticky="w"
+        )
+
+        description_label = ctk.CTkLabel(
+            add_book_window,
+            text="Description:"
+        )
+        description_label.grid(
+            row=4,
+            column=0,
+            padx=padding,
+            pady=padding,
+            sticky="e"
+        )
+
+        entry_for_description = ctk.CTkEntry(
+            add_book_window,
+            placeholder_text="Optional"
+        )
+        entry_for_description.grid(
+            row=4,
+            column=1,
+            padx=padding,
+            pady=padding,
             sticky="w"
         )
 
@@ -699,10 +771,10 @@ class BookWormApp(ctk.CTk):
             text="Year:"
         )
         year_label.grid(
-            row=4,
+            row=5,
             column=0,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="e"
         )
 
@@ -711,10 +783,10 @@ class BookWormApp(ctk.CTk):
             placeholder_text="Optional"
         )
         entry_for_year.grid(
-            row=4,
+            row=5,
             column=1,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="w"
         )
 
@@ -723,10 +795,10 @@ class BookWormApp(ctk.CTk):
             text="ISBN:"
         )
         isbn_label.grid(
-            row=5,
+            row=6,
             column=0,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="e"
         )
 
@@ -735,10 +807,10 @@ class BookWormApp(ctk.CTk):
             placeholder_text="Optional"
         )
         entry_for_isbn.grid(
-            row=5,
+            row=6,
             column=1,
-            padx=10,
-            pady=10,
+            padx=padding,
+            pady=padding,
             sticky="w"
         )
 
@@ -748,11 +820,62 @@ class BookWormApp(ctk.CTk):
             command=add_book
         )
         add_book_button.grid(
-            row=6,
+            row=7,
             column=0,
             columnspan=2,
             pady=20,
             sticky="s"
+        )
+
+    @staticmethod
+    def open_statistics_window():
+        statistics_window = ctk.CTkToplevel()
+
+        statistics_window.title("Statistics")
+
+        width = 400
+        height = 400
+
+        padding_y = 10
+
+        statistics_window.geometry(f"{width}x{height}")
+
+        statistics_window.columnconfigure((0, 1), weight=1)
+
+        book_worm_label = ctk.CTkLabel(
+            statistics_window,
+            text="Statistics of Library:",
+            font=("Helvetica", 20, "bold")
+        )
+        book_worm_label.pack(
+            pady=(20, 10),
+        )
+
+
+        with Session() as session:
+            repo = Repo(session)
+
+            total_books_count = repo.get_books_count()
+            read_count, unread_count = repo.get_read_and_unread_count()
+
+            read_percentage = (read_count / total_books_count) * 100 if total_books_count else 0
+            unread_percentage = (unread_count / total_books_count) * 100 if total_books_count else 0
+
+        total_books_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Total count:\n{total_books_count}"
+        )
+        total_books_label.pack(
+            pady=padding_y,
+        )
+
+
+        count_of_read_unread_books_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Count of read/unread books:\n{read_count} ({read_percentage}%) / {unread_count} ({unread_percentage}%)"
+        )
+        count_of_read_unread_books_label.pack(
+            pady=padding_y,
         )
 
 
