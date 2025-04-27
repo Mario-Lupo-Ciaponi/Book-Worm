@@ -1,12 +1,13 @@
 import sqlalchemy.exc
-from docutils.nodes import description
-from sqlalchemy import insert, select, delete, update, column, func
+from sqlalchemy import insert, select, delete, update, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
 from tkinter import messagebox
+from datetime import datetime, timedelta
 
 from models import engine, Book
 from exceptions import EmptyFieldError, NegativeYearError, BookDoesNotExistError
+
 
 Session = sessionmaker(bind=engine)
 
@@ -24,6 +25,22 @@ class Repo:
         year: int=None,
         isbn: str=None,
     ):
+        """
+            Inserts records into the table books
+
+            Query:
+            INSERT INTO
+                books(title, author, genre, description, year, isbn)
+            VALUES
+                (
+                *title given*,
+                *author given*,
+                *genre given*,
+                *description given(if needed*,
+                *year given(if needed)*,
+                *isbn given(if needed)*
+                );
+        """
         stmt = insert(Book).values(
             title=title,
             author=author,
@@ -37,6 +54,12 @@ class Repo:
         self.session.commit()
 
     def get_all_books(self):
+        """
+            Gets all records from the books table
+
+            Query:
+            SELECT * FROM books;
+        """
         stmt = select(Book)
 
         result = self.session.execute(stmt)
@@ -55,6 +78,18 @@ class Repo:
 
         return result.scalars().all()
 
+    def oldest_book(self):
+        stmt = select(Book.title).order_by(Book.year).limit(1)
+        result = self.session.execute(stmt)
+
+        return result.scalars().first()
+
+    def newest_book(self):
+        stmt = select(Book.title).order_by(Book.year.desc()).limit(1)
+        result = self.session.execute(stmt)
+
+        return result.scalars().first()
+
     def get_books_count(self):
         stmt = select(func.count(Book.id))
 
@@ -70,6 +105,32 @@ class Repo:
 
         return read_count, unread_count
 
+    def get_books_count_added_in_the_past_month(self):
+        today = datetime.now()
+        one_month_ago = today - timedelta(days=30)
+
+        stmt = select(func.count(Book.id)).where(Book.added_on >= one_month_ago)
+
+        result = self.session.scalar(stmt)
+
+        return result
+
+    def get_most_common_genre(self):
+        stmt = (select(Book.genre, func.count(Book.id).label("count_of_genre"))
+                .group_by(Book.genre)
+                .order_by("count_of_genre")
+                .limit(1))
+
+        result = self.session.execute(stmt)
+
+        return result.scalars().first()
+
+    def get_average_publication_year(self):
+        stmt = select(func.avg(Book.year))
+
+        avg_publication_year = self.session.scalar(stmt)
+
+        return avg_publication_year
 
     def order_by_year(self, ascending):
         stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
@@ -236,16 +297,6 @@ class BookWormApp(ctk.CTk):
             count_of_books = repo.get_books_count()
 
             self.add_books_to_scrollable_frame(books)
-
-        # self.label_for_total_books = ctk.CTkLabel(
-        #     self,
-        #     text=f"Book's count: {count_of_books}"
-        # )
-        #
-        # self.label_for_total_books.grid(
-        #     row=5,
-        #     column=2
-        # )
 
         self.statistics_button = ctk.CTkButton(
             self,
@@ -834,7 +885,7 @@ class BookWormApp(ctk.CTk):
         statistics_window.title("Statistics")
 
         width = 400
-        height = 400
+        height = 445
 
         padding_y = 10
 
@@ -861,9 +912,18 @@ class BookWormApp(ctk.CTk):
             read_percentage = (read_count / total_books_count) * 100 if total_books_count else 0
             unread_percentage = (unread_count / total_books_count) * 100 if total_books_count else 0
 
+            most_common_genre = repo.get_most_common_genre()
+
+            most_recent_book = repo.oldest_book()
+            latest_book = repo.newest_book()
+
+            average_publication_year = repo.get_average_publication_year()
+
+            books_added_in_the_past_month = repo.get_books_count_added_in_the_past_month()
+
         total_books_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Total count:\n{total_books_count}"
+            text=f"Total number of books:\n{total_books_count}"
         )
         total_books_label.pack(
             pady=padding_y,
@@ -872,10 +932,62 @@ class BookWormApp(ctk.CTk):
 
         count_of_read_unread_books_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Count of read/unread books:\n{read_count} ({read_percentage}%) / {unread_count} ({unread_percentage}%)"
+            text=f"Count of read/unread books:\n"
+                 f"{read_count} ({read_percentage:.0f}%) / {unread_count} ({unread_percentage:.0f}%)"
         )
         count_of_read_unread_books_label.pack(
             pady=padding_y,
+        )
+
+        read_unread_progress_bar = ctk.CTkProgressBar(
+            statistics_window,
+            orientation="horizontal",
+            fg_color="red",
+            progress_color="green",
+        )
+        read_unread_progress_bar.pack(
+            pady=5
+        )
+        read_unread_progress_bar.set(read_percentage/100)
+
+        most_common_genre_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Most common genre:\n{most_common_genre}"
+        )
+        most_common_genre_label.pack(
+            pady=padding_y
+        )
+
+        most_recent_book_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Oldest book:\n{most_recent_book}"
+        )
+        most_recent_book_label.pack(
+            pady=padding_y
+        )
+
+        latest_book_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Newest book:\n{latest_book}"
+        )
+        latest_book_label.pack(
+            pady=padding_y
+        )
+
+        average_publication_year_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Average publication year:\n{average_publication_year:.0f}"
+        )
+        average_publication_year_label.pack(
+            pady=padding_y
+        )
+
+        books_added_in_the_past_month_label = ctk.CTkLabel(
+            statistics_window,
+            text=f"Books added in the past month:\n{books_added_in_the_past_month}"
+        )
+        books_added_in_the_past_month_label.pack(
+            pady=padding_y
         )
 
 
