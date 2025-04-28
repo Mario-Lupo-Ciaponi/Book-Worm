@@ -132,6 +132,13 @@ class Repo:
 
         return avg_publication_year
 
+    def get_books_that_contain_substring(self, substring):
+        stmt = select(Book).where(Book.title.contains(substring))
+
+        result = self.session.execute(stmt)
+
+        return result
+
     def order_by_year(self, ascending):
         stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
         result = self.session.execute(stmt)
@@ -192,7 +199,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 550
+        height = 580
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -201,6 +208,7 @@ class BookWormApp(ctk.CTk):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
         self.columnconfigure((0, 1, 2), weight=1)
+        self.contains_value = ctk.StringVar(value="No order")
 
         # Label that will show up at the top
         self.book_worm_label = ctk.CTkLabel(
@@ -252,6 +260,20 @@ class BookWormApp(ctk.CTk):
             sticky="w",
         )
 
+        self.contains_value = ctk.BooleanVar(value=False)
+        self.check_button_for_contain = ctk.CTkCheckBox(
+            self,
+            text="Contains",
+            onvalue=True,
+            offvalue=False,
+            variable=self.contains_value
+        )
+        self.check_button_for_contain.grid(
+            row=2,
+            column=2,
+            pady=10
+        )
+
         self.add_book_button = ctk.CTkButton(
             self,
             text="+ Add book",
@@ -259,7 +281,7 @@ class BookWormApp(ctk.CTk):
             command=self.open_add_book_window
         )
         self.add_book_button.grid(
-            row=2,
+            row=3,
             column=2,
             padx=20,
             pady=10,
@@ -271,7 +293,7 @@ class BookWormApp(ctk.CTk):
             font=("Helvetica", 17, "bold")
         )
         self.label_for_booklist.grid(
-            row=3,
+            row=4,
             column=0,
             columnspan=3,
             sticky="n",
@@ -283,20 +305,14 @@ class BookWormApp(ctk.CTk):
             width=400,
         )
         self.scrollable_frame_books.grid(
-            row=4,
+            row=5,
             column=0,
             columnspan=3,
             sticky="n",
             pady=(20, 5)
         )
 
-        with Session() as session:
-            repo = Repo(session)
-
-            books = repo.get_all_books()
-            count_of_books = repo.get_books_count()
-
-            self.add_books_to_scrollable_frame(books)
+        self.prepare_books()
 
         self.statistics_button = ctk.CTkButton(
             self,
@@ -305,39 +321,37 @@ class BookWormApp(ctk.CTk):
             width=100
         )
         self.statistics_button.grid(
-            row=5,
+            row=6,
             column=2,
             pady=10
         )
 
-        self.option_value = ctk.StringVar(value="Title(A-Z)")
+        self.order_label = ctk.CTkLabel(
+            self,
+            text="Order by:"
+        )
+        self.order_label.grid(
+            row=7,
+            column=0,
+            sticky="e",
+        )
+
         self.combo_box_for_order = ctk.CTkComboBox(
             self,
-            values=["Title(A-Z)", "Title(Z-A)",
+            values=["No order",
+                    "Title(A-Z)", "Title(Z-A)",
                     "Author(A-Z)", "Author(Z-A)",
                     "Year(Latest)", "Year(Earliest)",
                     "Added on(Latest)", "Added on(Earliest)"],
-            variable=self.option_value,
+            variable=self.contains_value,
             width=160,
+            command=self.prepare_books
         )
         self.combo_box_for_order.grid(
-            row=6,
+            row=7,
             column=1,
-            sticky="e",
+            sticky="w",
             padx=20
-        )
-
-        self.order_by_button = ctk.CTkButton(
-            self,
-            text="Order by",
-            width=100,
-            command=self.order_in_frame
-        )
-        self.order_by_button.grid(
-            row=6,
-            column=2,
-            pady=20,
-            sticky="w"
         )
 
 
@@ -355,25 +369,6 @@ class BookWormApp(ctk.CTk):
 
             return False
 
-    def order_in_frame(self):
-        with Session() as session:
-            repo = Repo(session)
-            order_option = self.option_value.get()
-
-            if "Title" in order_option:
-                books = repo.order_by_title(True if "A-Z" in order_option else False)
-            elif "Author" in order_option:
-                books = repo.order_by_author(True if "A-Z" in order_option else False)
-            elif "Year" in order_option:
-                books = repo.order_by_year(True if "Earliest" in order_option else False)
-            elif "Added on" in order_option:
-                books = repo.order_by_added_on(True if "Earliest" in order_option else False)
-            else:
-                messagebox.showerror("Invalid option!", "Invalid order option!")
-                return
-
-            self.add_books_to_scrollable_frame(books)
-
     def remove_book_from_scrollable_frame(self):
         for book in self.scrollable_frame_books.winfo_children():
             book.destroy()
@@ -384,22 +379,24 @@ class BookWormApp(ctk.CTk):
 
             if not title:
                 raise EmptyFieldError
-            if not self.check_if_book_exists_by_title(title):
-                messagebox.showerror("No book found!", f'"{title}" was not found!')
-                raise BookDoesNotExistError
+
+            with Session() as session:
+                repo = Repo(session)
+                books = ""
+
+                if not self.contains_value:
+                    if not self.check_if_book_exists_by_title(title):
+                        raise BookDoesNotExistError
+
+                    books = repo.get_books_by_title(title)
+                else:
+                    pass
+
+                self.prepare_books()
         except EmptyFieldError:
             messagebox.showerror("Empty field!", "The search field must not be empty!")
         except BookDoesNotExistError:
             messagebox.showerror("Book does not exist!", f'"{title}" does not exist in the library!')
-        else:
-            with Session() as session:
-                repo = Repo(session)
-
-                self.remove_book_from_scrollable_frame()
-
-                books = repo.get_books_by_title(title)
-
-                self.add_books_to_scrollable_frame(books)
 
     def delete_book(self, title: str):
         user_answer = messagebox.askyesno("Are you sure?", f'Are you sure you want to delete "{title}"?')
@@ -409,9 +406,8 @@ class BookWormApp(ctk.CTk):
                 repo = Repo(session)
 
                 repo.delete_book_by_title(title)
-                books = repo.get_all_books()
 
-                self.add_books_to_scrollable_frame(books)
+                self.prepare_books()
 
                 messagebox.showinfo("Successful deletion!", f'"{title}" was deleted successfully!')
 
@@ -435,9 +431,7 @@ class BookWormApp(ctk.CTk):
 
                     repo.update_book(title_of_book, new_title, new_author, new_genre, new_year, new_isbn)
 
-                    books = repo.get_all_books()
-
-                    self.add_books_to_scrollable_frame(books)
+                    self.prepare_books()
                     messagebox.showinfo("Successful update!", "The book was successfully updated!")
             except ValueError or NegativeYearError:
                 messagebox.showerror("Invalid year!", "Year must be a positive integer number!")
@@ -606,7 +600,27 @@ class BookWormApp(ctk.CTk):
             repo = Repo(session)
             repo.update_book_read_status(book)
 
-            books = repo.get_all_books()
+            self.prepare_books()
+
+    def prepare_books(self, event=None):
+        with Session() as session:
+            repo = Repo(session)
+            order_option = self.contains_value.get()
+
+            if "No order" in order_option:
+                books = repo.get_all_books()
+            elif "Title" in order_option:
+                books = repo.order_by_title(True if "A-Z" in order_option else False)
+            elif "Author" in order_option:
+                books = repo.order_by_author(True if "A-Z" in order_option else False)
+            elif "Year" in order_option:
+                books = repo.order_by_year(True if "Earliest" in order_option else False)
+            elif "Added on" in order_option:
+                books = repo.order_by_added_on(True if "Earliest" in order_option else False)
+            else:
+                messagebox.showerror("Invalid option!", "Invalid order option!")
+                return
+
             self.add_books_to_scrollable_frame(books)
 
     def add_books_to_scrollable_frame(self, books: Book):
@@ -683,9 +697,7 @@ class BookWormApp(ctk.CTk):
                         isbn if isbn else None
                     )
 
-                    books = repo.get_all_books()
-
-                    self.add_books_to_scrollable_frame(books)
+                    self.prepare_books()
                     messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
             except EmptyFieldError:
                 messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
