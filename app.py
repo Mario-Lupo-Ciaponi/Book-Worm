@@ -53,6 +53,20 @@ class Repo:
         self.session.execute(stmt)
         self.session.commit()
 
+    def get_all_genres(self):
+        stmt = select(Book.genre).distinct(Book.genre)
+
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def filter_by_genre(self, genre):
+        stmt = select(Book).where(Book.genre == genre)
+
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
     def get_all_books(self):
         """
             Gets all records from the books table
@@ -133,11 +147,11 @@ class Repo:
         return avg_publication_year
 
     def get_books_that_contain_substring(self, substring):
-        stmt = select(Book).where(Book.title.contains(substring))
+        stmt = select(Book).where(Book.title.ilike(f"%{substring}%"))
 
         result = self.session.execute(stmt)
 
-        return result
+        return result.scalars().all()
 
     def order_by_year(self, ascending):
         stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
@@ -199,7 +213,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 580
+        height = 620
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -208,7 +222,7 @@ class BookWormApp(ctk.CTk):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
         self.columnconfigure((0, 1, 2), weight=1)
-        self.contains_value = ctk.StringVar(value="No order")
+        self.order_option = ctk.StringVar(value="No order")
 
         # Label that will show up at the top
         self.book_worm_label = ctk.CTkLabel(
@@ -284,7 +298,7 @@ class BookWormApp(ctk.CTk):
             row=3,
             column=2,
             padx=20,
-            pady=10,
+            pady=(20, 10),
         )
 
         self.label_for_booklist = ctk.CTkLabel(
@@ -343,7 +357,7 @@ class BookWormApp(ctk.CTk):
                     "Author(A-Z)", "Author(Z-A)",
                     "Year(Latest)", "Year(Earliest)",
                     "Added on(Latest)", "Added on(Earliest)"],
-            variable=self.contains_value,
+            variable=self.order_option,
             width=160,
             command=self.prepare_books
         )
@@ -354,6 +368,29 @@ class BookWormApp(ctk.CTk):
             padx=20
         )
 
+        self.genre_chosen_var = ctk.StringVar(value="No genre")
+        self.filter_by_genre_combo_box = ctk.CTkComboBox(
+            self,
+            values=self.genres,
+            variable=self.genre_chosen_var,
+            command=self.filter_by_genre
+        )
+        self.filter_by_genre_combo_box.grid(
+            row=8,
+            column=1,
+            pady=10
+        )
+
+
+    @property
+    def genres(self):
+        with Session() as session:
+            repo = Repo(session)
+
+            genres = repo.get_all_genres()
+            genres.append("No genre")
+
+            return genres
 
     @staticmethod
     def check_if_book_exists_by_title(title: str):
@@ -382,17 +419,18 @@ class BookWormApp(ctk.CTk):
 
             with Session() as session:
                 repo = Repo(session)
-                books = ""
 
-                if not self.contains_value:
+                does_need_to_contain = self.contains_value.get()
+
+                if not does_need_to_contain:
                     if not self.check_if_book_exists_by_title(title):
                         raise BookDoesNotExistError
 
                     books = repo.get_books_by_title(title)
                 else:
-                    pass
+                    books = repo.get_books_that_contain_substring(title)
 
-                self.prepare_books()
+                self.add_books_to_scrollable_frame(books)
         except EmptyFieldError:
             messagebox.showerror("Empty field!", "The search field must not be empty!")
         except BookDoesNotExistError:
@@ -602,10 +640,28 @@ class BookWormApp(ctk.CTk):
 
             self.prepare_books()
 
+    def filter_by_genre(self, event=None):
+        genre_option = self.genre_chosen_var.get()
+
+        if genre_option == "No genre":
+            self.prepare_books()
+        elif genre_option not in self.genres:
+            messagebox.showerror("Invalid Genre!", "Invalid genre option!")
+            return
+
+        with Session() as session:
+            repo = Repo(session)
+
+            books = repo.filter_by_genre(genre_option)
+
+            self.add_books_to_scrollable_frame(books)
+
+
+
     def prepare_books(self, event=None):
         with Session() as session:
             repo = Repo(session)
-            order_option = self.contains_value.get()
+            order_option = self.order_option.get()
 
             if "No order" in order_option:
                 books = repo.get_all_books()
