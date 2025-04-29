@@ -86,11 +86,42 @@ class Repo:
 
         return result.scalars().first()
 
-    def get_books_by_title(self, title: str):
-        stmt = select(Book).where(Book.title == title)
+    def get_books_by_title_contain(self, title: str):
+        stmt = select(Book).where(Book.title.ilike(f"%{title}%"))
         result = self.session.execute(stmt)
 
         return result.scalars().all()
+
+    def get_books_by_author_contain(self, author: str):
+        stmt = select(Book).where(Book.author.ilike(f"%{author}%"))
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def get_books_by_year(self, year: int):
+        stmt = select(Book).where(Book.year == year)
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def get_books_by_genre_contain(self, genre: str):
+        stmt = select(Book).where(Book.genre.ilike(f"%{genre}%"))
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def get_books_by_description_contain(self, description: str):
+        stmt = select(Book).where(Book.description.ilike(f"%{description}%"))
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
+    def get_books_by_isbn_contain(self, isbn: str):
+        stmt = select(Book).where(Book.isbn.ilike(f"%{isbn}%"))
+        result = self.session.execute(stmt)
+
+        return result.scalars().all()
+
 
     def oldest_book(self):
         stmt = select(Book.title).order_by(Book.year).limit(1)
@@ -145,13 +176,6 @@ class Repo:
         avg_publication_year = self.session.scalar(stmt)
 
         return avg_publication_year
-
-    def get_books_that_contain_substring(self, substring):
-        stmt = select(Book).where(Book.title.ilike(f"%{substring}%"))
-
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
 
     def order_by_year(self, ascending):
         stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
@@ -274,18 +298,15 @@ class BookWormApp(ctk.CTk):
             sticky="w",
         )
 
-        self.contains_value = ctk.BooleanVar(value=False)
-        self.check_button_for_contain = ctk.CTkCheckBox(
+        self.search_choice = ctk.StringVar(value="title")
+        self.search_option_menu = ctk.CTkOptionMenu(
             self,
-            text="Contains",
-            onvalue=True,
-            offvalue=False,
-            variable=self.contains_value
+            values=["title", "author", "genre", "year", "description", "isbn"],
+            variable=self.search_choice
         )
-        self.check_button_for_contain.grid(
+        self.search_option_menu.grid(
             row=2,
-            column=2,
-            pady=10
+            column=1
         )
 
         self.add_book_button = ctk.CTkButton(
@@ -412,29 +433,39 @@ class BookWormApp(ctk.CTk):
 
     def search_book(self):
         try:
-            title = self.search_entry.get().strip()
-
-            if not title:
-                raise EmptyFieldError
-
             with Session() as session:
                 repo = Repo(session)
 
-                does_need_to_contain = self.contains_value.get()
+                mapper_for_searching_options = {
+                    "title": repo.get_books_by_title_contain,
+                    "author": repo.get_books_by_author_contain,
+                    "genre": repo.get_books_by_genre_contain,
+                    "year": repo.get_books_by_year,
+                    "description": repo.get_books_by_description_contain,
+                    "isbn": repo.get_books_by_isbn_contain
+                }
 
-                if not does_need_to_contain:
-                    if not self.check_if_book_exists_by_title(title):
-                        raise BookDoesNotExistError
+                search_entry_value = self.search_entry.get().strip()
 
-                    books = repo.get_books_by_title(title)
-                else:
-                    books = repo.get_books_that_contain_substring(title)
+                if not search_entry_value:
+                    raise EmptyFieldError
+
+                search_value_option = self.search_choice.get()
+
+                if search_entry_value == "year":
+                    search_entry_value = int(search_entry_value)
+
+                    if 0 > search_entry_value:
+                        raise NegativeYearError
+
+                books = mapper_for_searching_options[search_value_option](search_entry_value)
 
                 self.add_books_to_scrollable_frame(books)
+
         except EmptyFieldError:
             messagebox.showerror("Empty field!", "The search field must not be empty!")
-        except BookDoesNotExistError:
-            messagebox.showerror("Book does not exist!", f'"{title}" does not exist in the library!')
+        except ValueError or NegativeYearError:
+            messagebox.showerror("Invalid year!", "Year must be a postivie integer number!")
 
     def delete_book(self, title: str):
         user_answer = messagebox.askyesno("Are you sure?", f'Are you sure you want to delete "{title}"?')
@@ -679,21 +710,25 @@ class BookWormApp(ctk.CTk):
 
             self.add_books_to_scrollable_frame(books)
 
+    @staticmethod
+    def show_books_information(books):
+        pass
+
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
 
         for book in books:
             book_for_frame = ctk.CTkLabel(
                 self.scrollable_frame_books,
-                text=f"Title: {book.title};\n"
-                     f"Author: {book.author};\n"
-                     f"Genre: {book.genre};\n"
-                     f"Year: {book.year};\n"
-                     f"ISBN: {book.isbn}\n"
-                     f"Added on: {book.added_on}",
-
+                text=f"Title: {book.title}\n"
+                     f"Author: {book.author}\n"
+                     f"Genre: {book.genre}\n"
+                     f"ISBN: {book.isbn if book.isbn else "No ISBN"}",
+                font=("Helvetica", 15)
             )
-            book_for_frame.pack(pady=(20, 5))
+            book_for_frame.pack(pady=(20, 9))
+
+            width_for_buttons = 60
 
             is_read_value = ctk.BooleanVar(value=book.is_read)
             is_read_checkbox = ctk.CTkCheckBox(
@@ -706,11 +741,20 @@ class BookWormApp(ctk.CTk):
             )
             is_read_checkbox.pack(pady=10)
 
+            more_details_button = ctk.CTkButton(
+                self.scrollable_frame_books,
+                command=lambda b=book: self.show_books_information,
+                text="Details",
+                width=width_for_buttons,
+                fg_color="green",
+            )
+            more_details_button.pack(pady=5)
+
             edit_button = ctk.CTkButton(
                 self.scrollable_frame_books,
                 command=lambda b=book: self.edit_book(b.title),
                 text="Edit",
-                width=60
+                width=width_for_buttons,
             )
             edit_button.pack(pady=5)
 
@@ -718,7 +762,7 @@ class BookWormApp(ctk.CTk):
                 self.scrollable_frame_books,
                 command=lambda b=book: self.delete_book(b.title),
                 text="Delete",
-                width=60,
+                width=width_for_buttons,
                 fg_color="red"
             )
             delete_button.pack(pady=(5, 15))
