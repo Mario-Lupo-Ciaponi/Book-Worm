@@ -237,7 +237,7 @@ class BookWormApp(ctk.CTk):
 
         self.update_idletasks()
         width = 500
-        height = 620
+        height = 655
 
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -245,14 +245,19 @@ class BookWormApp(ctk.CTk):
 
         self.geometry(f"{width}x{height}+{x}+{y}")
 
+        self.theme = "dark"
+        ctk.set_appearance_mode(self.theme)
+
+        self.bind("<Escape>", self.close_window)
+
         self.columnconfigure((0, 1, 2), weight=1)
         self.order_option = ctk.StringVar(value="No order")
 
         # Label that will show up at the top
         self.book_worm_label = ctk.CTkLabel(
             self,
-            text="BookWorm - Your Personal Library",
-            font=("Helvetica", 20, "bold")
+            text="📚BookWorm - Your Personal Library",
+            font=("Segoe UI", 20, "bold")
         )
         self.book_worm_label.grid(
             row=0,
@@ -273,9 +278,11 @@ class BookWormApp(ctk.CTk):
             sticky="e"
         )
 
+        self.search_choice = ctk.StringVar(value="title")
+
         self.search_entry = ctk.CTkEntry(
             self,
-            placeholder_text="Enter Title of Book here"
+            placeholder_text=f"Enter {self.search_choice.get().capitalize()} of Book here"
         )
         self.search_entry.grid(
             row=1,
@@ -287,8 +294,8 @@ class BookWormApp(ctk.CTk):
 
         self.button_for_search = ctk.CTkButton(
             self,
-            text="Search",
-            command=self.search_book
+            text="🔍 Search",
+            command=self.search_book,
         )
         self.button_for_search.grid(
             row=1,
@@ -298,11 +305,11 @@ class BookWormApp(ctk.CTk):
             sticky="w",
         )
 
-        self.search_choice = ctk.StringVar(value="title")
         self.search_option_menu = ctk.CTkOptionMenu(
             self,
             values=["title", "author", "genre", "year", "description", "isbn"],
-            variable=self.search_choice
+            variable=self.search_choice,
+            command=self.change_placeholder_text_of_search_entry
         )
         self.search_option_menu.grid(
             row=2,
@@ -325,14 +332,14 @@ class BookWormApp(ctk.CTk):
         self.label_for_booklist = ctk.CTkLabel(
             self,
             text="Booklist:",
-            font=("Helvetica", 17, "bold")
+            font=("Segoe UI", 17, "bold")
         )
         self.label_for_booklist.grid(
             row=4,
             column=0,
             columnspan=3,
             sticky="n",
-            pady=(20, 5)
+            pady=(20, 0)
         )
 
         self.scrollable_frame_books = ctk.CTkScrollableFrame(
@@ -344,14 +351,14 @@ class BookWormApp(ctk.CTk):
             column=0,
             columnspan=3,
             sticky="n",
-            pady=(20, 5)
+            pady=(10, 5)
         )
 
         self.prepare_books()
 
         self.statistics_button = ctk.CTkButton(
             self,
-            text="Statistics",
+            text="📈Statistics",
             command=self.open_statistics_window,
             width=100
         )
@@ -402,6 +409,17 @@ class BookWormApp(ctk.CTk):
             pady=10
         )
 
+        self.toggle_theme_button = ctk.CTkButton(
+            self,
+            text="☀️",
+            width=30,
+            command=self.toggle_theme
+        )
+        self.toggle_theme_button.grid(
+            row=9,
+            column=2,
+            pady=10
+        )
 
     @property
     def genres(self):
@@ -412,6 +430,28 @@ class BookWormApp(ctk.CTk):
             genres.append("No genre")
 
             return genres
+
+    def change_placeholder_text_of_search_entry(self, event=None):
+        search_choice_var = self.search_choice.get()
+        self.search_entry.configure(placeholder_text=f"Enter {search_choice_var.capitalize()} of Book here")
+
+    def toggle_theme(self):
+        if self.theme == "dark":
+            self.theme = "light"
+            ctk.set_appearance_mode(self.theme)
+
+            self.toggle_theme_button.configure(text="🌙")
+        else:
+            self.theme = "dark"
+            ctk.set_appearance_mode(self.theme)
+
+            self.toggle_theme_button.configure(text="☀️")
+
+    @staticmethod
+    def make_empty_entries(window):
+        for widget in window.winfo_children():
+            if isinstance(widget, ctk.CTkEntry):
+                widget.delete(0, len(widget.get()))
 
     @staticmethod
     def check_if_book_exists_by_title(title: str):
@@ -502,6 +542,8 @@ class BookWormApp(ctk.CTk):
 
                     self.prepare_books()
                     messagebox.showinfo("Successful update!", "The book was successfully updated!")
+
+                    self.make_empty_entries(edit_window)
             except ValueError or NegativeYearError:
                 messagebox.showerror("Invalid year!", "Year must be a positive integer number!")
             except sqlalchemy.exc.IntegrityError:
@@ -522,7 +564,7 @@ class BookWormApp(ctk.CTk):
         edit_label = ctk.CTkLabel(
             edit_window,
             text=f'Edit - "{title_of_book}"',
-            font=("Helvetica", 20, "bold")
+            font=("Segoe UI", 20, "bold")
         )
         edit_label.grid(
             row=0,
@@ -711,8 +753,95 @@ class BookWormApp(ctk.CTk):
             self.add_books_to_scrollable_frame(books)
 
     @staticmethod
-    def show_books_information(books):
-        pass
+    def show_books_information(book):
+        title_of_book = book.title
+        author_of_book = book.author
+        genre_of_book = book.genre
+        year_of_book = book.year
+        description_of_book = book.description
+        isbn_of_book = book.isbn
+        is_read = book.is_read
+        added_on = book.added_on
+
+        width = 400
+        height = 500
+
+        padding = 10
+
+        book_detail_window = ctk.CTkToplevel()
+        book_detail_window.title(title_of_book)
+        book_detail_window.geometry(f"{width}x{height}")
+
+        book_title_label = ctk.CTkLabel(
+            book_detail_window,
+            text=title_of_book,
+            font=("Segoe UI", 20, "bold")
+        )
+        book_title_label.pack(
+            pady=(20, 10)
+        )
+
+        book_author_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Author:\n{author_of_book}"
+        )
+        book_author_label.pack(
+            pady=padding
+        )
+
+        book_genre_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Genre:\n{genre_of_book}"
+        )
+        book_genre_label.pack(
+            pady=padding
+        )
+
+        book_year_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Year:\n{year_of_book if year_of_book else "No year"}"
+        )
+        book_year_label.pack(
+            pady=padding
+        )
+
+        book_description_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Description:\n{description_of_book if description_of_book else "No description"}",
+            wraplength=400
+        )
+        book_description_label.pack(
+            pady=padding
+        )
+
+        book_isbn_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"ISBN:\n{isbn_of_book if isbn_of_book else "No ISBN"}",
+            wraplength=400
+        )
+        book_isbn_label.pack(
+            pady=padding
+        )
+
+        book_is_read_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Is read:\n{"Yes" if is_read else "No"}",
+            wraplength=400
+        )
+        book_is_read_label.pack(
+            pady=padding
+        )
+
+        book_added_on_label = ctk.CTkLabel(
+            book_detail_window,
+            text=f"Added on:\n{added_on.strftime("%d %B, %Y at %H:%M")}",
+            wraplength=400
+        )
+        book_added_on_label.pack(
+            pady=padding
+        )
+
+
 
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
@@ -743,7 +872,7 @@ class BookWormApp(ctk.CTk):
 
             more_details_button = ctk.CTkButton(
                 self.scrollable_frame_books,
-                command=lambda b=book: self.show_books_information,
+                command=lambda b=book: self.show_books_information(b),
                 text="Details",
                 width=width_for_buttons,
                 fg_color="green",
@@ -774,6 +903,7 @@ class BookWormApp(ctk.CTk):
             author = entry_for_author.get().strip()
             genre = entry_for_genre.get().strip()
             year = entry_for_year.get().strip()
+            description = entry_for_description.get().strip()
             isbn = entry_for_isbn.get().strip()
 
             try:
@@ -793,12 +923,14 @@ class BookWormApp(ctk.CTk):
                         title,
                         author,
                         genre,
+                        description if description else None,
                         year if year else None,
                         isbn if isbn else None
                     )
 
                     self.prepare_books()
                     messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
+                    self.make_empty_entries(add_book_window)
             except EmptyFieldError:
                 messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
             except ValueError:
@@ -812,7 +944,7 @@ class BookWormApp(ctk.CTk):
         add_book_window.title("Add book to library")
 
         width = 440
-        height = 420
+        height = 495
 
         x = 25
         y = (self.winfo_screenheight() // 2) - (height // 2)
@@ -826,7 +958,7 @@ class BookWormApp(ctk.CTk):
         add_book_label = ctk.CTkLabel(
             add_book_window,
             text="Add New Book:",
-            font=("Helvetica", 20, "bold")
+            font=("Segoe UI", 20, "bold")
         )
         add_book_label.grid(
             row=0,
@@ -836,12 +968,25 @@ class BookWormApp(ctk.CTk):
             pady=(20, 10)
         )
 
+        required_field_label = ctk.CTkLabel(
+            add_book_window,
+            text="--- Required fields ---",
+            font=("Helvetica", 13)
+        )
+        required_field_label.grid(
+            row=1,
+            column=0,
+            columnspan=2,
+            sticky="s",
+            pady=(0, 10)
+        )
+
         title_label = ctk.CTkLabel(
             add_book_window,
             text="Title:"
         )
         title_label.grid(
-            row=1,
+            row=2,
             column=0,
             padx=padding,
             pady=padding,
@@ -852,19 +997,21 @@ class BookWormApp(ctk.CTk):
             add_book_window,
         )
         entry_for_title.grid(
-            row=1,
+            row=2,
             column=1,
             padx=padding,
             pady=padding,
             sticky="w"
         )
 
+        entry_for_title.focus_set()
+
         author_label = ctk.CTkLabel(
             add_book_window,
             text="Author:"
         )
         author_label.grid(
-            row=2,
+            row=3,
             column=0,
             padx=padding,
             pady=padding,
@@ -875,7 +1022,7 @@ class BookWormApp(ctk.CTk):
             add_book_window,
         )
         entry_for_author.grid(
-            row=2,
+            row=3,
             column=1,
             padx=padding,
             pady=padding,
@@ -887,7 +1034,7 @@ class BookWormApp(ctk.CTk):
             text="Genre:"
         )
         genre_label.grid(
-            row=3,
+            row=4,
             column=0,
             padx=padding,
             pady=padding,
@@ -898,11 +1045,24 @@ class BookWormApp(ctk.CTk):
             add_book_window,
         )
         entry_for_genre.grid(
-            row=3,
+            row=4,
             column=1,
             padx=padding,
             pady=padding,
             sticky="w"
+        )
+
+        optional_field_label = ctk.CTkLabel(
+            add_book_window,
+            text="--- Optional fields ---",
+            font=("Helvetica", 13)
+        )
+        optional_field_label.grid(
+            row=5,
+            column=0,
+            columnspan=2,
+            sticky="s",
+            pady=(10, 10)
         )
 
         description_label = ctk.CTkLabel(
@@ -910,7 +1070,7 @@ class BookWormApp(ctk.CTk):
             text="Description:"
         )
         description_label.grid(
-            row=4,
+            row=6,
             column=0,
             padx=padding,
             pady=padding,
@@ -919,10 +1079,9 @@ class BookWormApp(ctk.CTk):
 
         entry_for_description = ctk.CTkEntry(
             add_book_window,
-            placeholder_text="Optional"
         )
         entry_for_description.grid(
-            row=4,
+            row=6,
             column=1,
             padx=padding,
             pady=padding,
@@ -934,7 +1093,7 @@ class BookWormApp(ctk.CTk):
             text="Year:"
         )
         year_label.grid(
-            row=5,
+            row=7,
             column=0,
             padx=padding,
             pady=padding,
@@ -943,10 +1102,10 @@ class BookWormApp(ctk.CTk):
 
         entry_for_year = ctk.CTkEntry(
             add_book_window,
-            placeholder_text="Optional"
+            placeholder_text="e.g. 2025"
         )
         entry_for_year.grid(
-            row=5,
+            row=7,
             column=1,
             padx=padding,
             pady=padding,
@@ -958,7 +1117,7 @@ class BookWormApp(ctk.CTk):
             text="ISBN:"
         )
         isbn_label.grid(
-            row=6,
+            row=8,
             column=0,
             padx=padding,
             pady=padding,
@@ -967,10 +1126,9 @@ class BookWormApp(ctk.CTk):
 
         entry_for_isbn = ctk.CTkEntry(
             add_book_window,
-            placeholder_text="Optional"
         )
         entry_for_isbn.grid(
-            row=6,
+            row=8,
             column=1,
             padx=padding,
             pady=padding,
@@ -983,7 +1141,7 @@ class BookWormApp(ctk.CTk):
             command=add_book
         )
         add_book_button.grid(
-            row=7,
+            row=9,
             column=0,
             columnspan=2,
             pady=20,
@@ -1008,7 +1166,7 @@ class BookWormApp(ctk.CTk):
         book_worm_label = ctk.CTkLabel(
             statistics_window,
             text="Statistics of Library:",
-            font=("Helvetica", 20, "bold")
+            font=("Segoe UI", 20, "bold")
         )
         book_worm_label.pack(
             pady=(20, 10),
@@ -1035,7 +1193,7 @@ class BookWormApp(ctk.CTk):
 
         total_books_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Total number of books:\n{total_books_count}"
+            text=f"📘Total number of books:\n{total_books_count}"
         )
         total_books_label.pack(
             pady=padding_y,
@@ -1044,7 +1202,7 @@ class BookWormApp(ctk.CTk):
 
         count_of_read_unread_books_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Count of read/unread books:\n"
+            text=f"📈Count of read/unread books:\n"
                  f"{read_count} ({read_percentage:.0f}%) / {unread_count} ({unread_percentage:.0f}%)"
         )
         count_of_read_unread_books_label.pack(
@@ -1055,7 +1213,7 @@ class BookWormApp(ctk.CTk):
             statistics_window,
             orientation="horizontal",
             fg_color="red",
-            progress_color="green",
+            progress_color="grey",
         )
         read_unread_progress_bar.pack(
             pady=5
@@ -1064,7 +1222,7 @@ class BookWormApp(ctk.CTk):
 
         most_common_genre_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Most common genre:\n{most_common_genre}"
+            text=f"📚Most common genre:\n{most_common_genre}"
         )
         most_common_genre_label.pack(
             pady=padding_y
@@ -1072,7 +1230,7 @@ class BookWormApp(ctk.CTk):
 
         most_recent_book_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Oldest book:\n{most_recent_book}"
+            text=f"📕Oldest book:\n{most_recent_book}"
         )
         most_recent_book_label.pack(
             pady=padding_y
@@ -1080,7 +1238,7 @@ class BookWormApp(ctk.CTk):
 
         latest_book_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Newest book:\n{latest_book}"
+            text=f"📖Newest book:\n{latest_book}"
         )
         latest_book_label.pack(
             pady=padding_y
@@ -1088,7 +1246,7 @@ class BookWormApp(ctk.CTk):
 
         average_publication_year_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Average publication year:\n{average_publication_year:.0f}"
+            text=f"📅Average publication year:\n{average_publication_year:.0f}"
         )
         average_publication_year_label.pack(
             pady=padding_y
@@ -1096,11 +1254,17 @@ class BookWormApp(ctk.CTk):
 
         books_added_in_the_past_month_label = ctk.CTkLabel(
             statistics_window,
-            text=f"Books added in the past month:\n{books_added_in_the_past_month}"
+            text=f"🧮Books added in the past month:\n{books_added_in_the_past_month}"
         )
         books_added_in_the_past_month_label.pack(
             pady=padding_y
         )
+
+    def close_window(self, event=None):
+        answer = messagebox.askyesno("Are you sure?", "Are you sure you want ot quit BookWorm?")
+
+        if answer:
+            self.destroy()
 
 
 def main():
