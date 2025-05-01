@@ -1,5 +1,4 @@
 import sqlalchemy.exc
-from docutils.nodes import description
 from sqlalchemy import insert, select, delete, update, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
@@ -82,6 +81,16 @@ class Repo:
         return result.scalars().all()
 
     def get_book_by_title(self, title: str):
+        """
+            SELECT
+                *
+            FROM
+                books
+            WHERE
+                title = {title}
+            LIMIT
+                1;
+        """
         stmt = select(Book).where(Book.title == title).limit(1)
         result = self.session.execute(stmt)
 
@@ -488,23 +497,20 @@ class BookWormApp(ctk.CTk):
                 search_entry_value = self.search_entry.get().strip()
 
                 if not search_entry_value:
-                    raise EmptyFieldError
+                    books = repo.get_all_books()
+                else:
+                    search_value_option = self.search_choice.get()
 
-                search_value_option = self.search_choice.get()
+                    if search_entry_value == "year":
+                        search_entry_value = int(search_entry_value)
 
-                if search_entry_value == "year":
-                    search_entry_value = int(search_entry_value)
+                        if 0 > search_entry_value:
+                            raise NegativeYearError
 
-                    if 0 > search_entry_value:
-                        raise NegativeYearError
-
-                books = mapper_for_searching_options[search_value_option](search_entry_value)
+                    books = mapper_for_searching_options[search_value_option](search_entry_value)
 
                 self.add_books_to_scrollable_frame(books)
-
-        except EmptyFieldError:
-            messagebox.showerror("Empty field!", "The search field must not be empty!")
-        except ValueError or NegativeYearError:
+        except (ValueError, NegativeYearError):
             messagebox.showerror("Invalid year!", "Year must be a postivie integer number!")
 
     def delete_book(self, title: str):
@@ -891,6 +897,14 @@ class BookWormApp(ctk.CTk):
 
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
+
+        if not books:
+            ctk.CTkLabel(
+                self.scrollable_frame_books,
+                text="No Books found!",
+                pady=80,
+                font=("Segoe UI", 20)
+            ).pack()
 
         for book in books:
             book_for_frame = ctk.CTkLabel(
