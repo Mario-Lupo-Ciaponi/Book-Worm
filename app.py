@@ -1,4 +1,5 @@
 import sqlalchemy.exc
+from docutils.nodes import description
 from sqlalchemy import insert, select, delete, update, func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
@@ -201,13 +202,14 @@ class Repo:
 
         return result.scalars().all()
 
-    def update_book(self, old_title, new_title, new_author, new_genre, new_year, new_isbn):
+    def update_book(self, old_title, new_title, new_author, new_genre, new_description, new_year, new_isbn):
         stmt = (update(Book)
                 .where(Book.title == old_title)
                 .values(
                     title=new_title if new_title else Book.title,
                     author=new_author if new_author else Book.author,
                     genre=new_genre if new_genre else Book.genre,
+                    description=new_description if new_description else Book.description,
                     year=new_year if new_year else Book.year,
                     isbn=new_isbn if new_isbn else Book.isbn
         ))
@@ -249,6 +251,9 @@ class BookWormApp(ctk.CTk):
         ctk.set_appearance_mode(self.theme)
 
         self.bind("<Escape>", self.close_window)
+        self.bind_all("<Control-n>", self.open_add_book_window)
+        self.bind_all("<Control-s>", self.open_statistics_window)
+        self.bind_all("<Control-t>", self.toggle_theme)
 
         self.columnconfigure((0, 1, 2), weight=1)
         self.order_option = ctk.StringVar(value="No order")
@@ -282,7 +287,6 @@ class BookWormApp(ctk.CTk):
 
         self.search_entry = ctk.CTkEntry(
             self,
-            placeholder_text=f"Enter {self.search_choice.get().capitalize()} of Book here"
         )
         self.search_entry.grid(
             row=1,
@@ -291,6 +295,7 @@ class BookWormApp(ctk.CTk):
             pady=10,
             sticky="we"
         )
+        self.search_entry.bind("<Return>", self.on_search_enter)
 
         self.button_for_search = ctk.CTkButton(
             self,
@@ -309,7 +314,6 @@ class BookWormApp(ctk.CTk):
             self,
             values=["title", "author", "genre", "year", "description", "isbn"],
             variable=self.search_choice,
-            command=self.change_placeholder_text_of_search_entry
         )
         self.search_option_menu.grid(
             row=2,
@@ -431,11 +435,7 @@ class BookWormApp(ctk.CTk):
 
             return genres
 
-    def change_placeholder_text_of_search_entry(self, event=None):
-        search_choice_var = self.search_choice.get()
-        self.search_entry.configure(placeholder_text=f"Enter {search_choice_var.capitalize()} of Book here")
-
-    def toggle_theme(self):
+    def toggle_theme(self, event=None):
         if self.theme == "dark":
             self.theme = "light"
             ctk.set_appearance_mode(self.theme)
@@ -521,10 +521,11 @@ class BookWormApp(ctk.CTk):
                 messagebox.showinfo("Successful deletion!", f'"{title}" was deleted successfully!')
 
     def edit_book(self, title_of_book):
-        def update_book():
+        def update_book(event=None):
             new_title = title_entry.get().strip()
             new_author = author_entry.get().strip()
             new_genre = genre_entry.get().strip()
+            new_description = description_entry.get().strip()
             new_year = year_entry.get().strip()
             new_isbn = isbn_entry.get().strip()
 
@@ -538,7 +539,14 @@ class BookWormApp(ctk.CTk):
                 with Session() as session:
                     repo = Repo(session)
 
-                    repo.update_book(title_of_book, new_title, new_author, new_genre, new_year, new_isbn)
+                    repo.update_book(
+                        title_of_book,
+                        new_title,
+                        new_author,
+                        new_genre,
+                        new_description,
+                        new_year,
+                        new_isbn)
 
                     self.prepare_books()
                     messagebox.showinfo("Successful update!", "The book was successfully updated!")
@@ -552,8 +560,12 @@ class BookWormApp(ctk.CTk):
 
         edit_window = ctk.CTkToplevel()
 
+        width = 400
+        height = 410
+
         edit_window.title(f'Edit "{title_of_book}"')
-        edit_window.geometry("400x400")
+        edit_window.geometry(f"{width}x{height}")
+        edit_window.bind("<Return>", update_book)
 
         edit_window.columnconfigure((0, 1), weight=1)
 
@@ -596,6 +608,7 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
+        title_entry.bind("<Down>", self.move_on_next_entry)
 
         author_label = ctk.CTkLabel(
             edit_window,
@@ -620,6 +633,8 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
+        author_entry.bind("<Down>", self.move_on_next_entry)
+        author_entry.bind("<Up>", self.move_on_previous_entry)
 
         genre_label = ctk.CTkLabel(
             edit_window,
@@ -644,13 +659,41 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
+        genre_entry.bind("<Down>", self.move_on_next_entry)
+        genre_entry.bind("<Up>", self.move_on_previous_entry)
+
+        description_label = ctk.CTkLabel(
+            edit_window,
+            text="Description:"
+        )
+        description_label.grid(
+            row=4,
+            column=0,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        description_entry = ctk.CTkEntry(
+            edit_window,
+            width=width_of_entries,
+            placeholder_text=place_holder_text,
+            justify="center"
+        )
+        description_entry.grid(
+            row=4,
+            column=1,
+            sticky="w"
+        )
+        description_entry.bind("<Down>", self.move_on_next_entry)
+        description_entry.bind("<Up>", self.move_on_previous_entry)
 
         year_label = ctk.CTkLabel(
             edit_window,
             text="Year:"
         )
         year_label.grid(
-            row=4,
+            row=5,
             column=0,
             pady=10,
             padx=10,
@@ -664,17 +707,19 @@ class BookWormApp(ctk.CTk):
             justify="center"
         )
         year_entry.grid(
-            row=4,
+            row=5,
             column=1,
             sticky="w"
         )
+        year_entry.bind("<Down>", self.move_on_next_entry)
+        year_entry.bind("<Up>", self.move_on_previous_entry)
 
         isbn_label = ctk.CTkLabel(
             edit_window,
             text="ISBN:"
         )
         isbn_label.grid(
-            row=5,
+            row=6,
             column=0,
             pady=10,
             padx=10,
@@ -688,10 +733,11 @@ class BookWormApp(ctk.CTk):
             justify="center"
         )
         isbn_entry.grid(
-            row=5,
+            row=6,
             column=1,
             sticky="w"
         )
+        isbn_entry.bind("<Up>", self.move_on_previous_entry)
 
         edit_button = ctk.CTkButton(
             edit_window,
@@ -699,7 +745,7 @@ class BookWormApp(ctk.CTk):
             text="Edit"
         )
         edit_button.grid(
-            row=6,
+            row=7,
             column=0,
             columnspan=2,
             pady=20,
@@ -897,8 +943,21 @@ class BookWormApp(ctk.CTk):
             delete_button.pack(pady=(5, 15))
 
 
-    def open_add_book_window(self):
-        def add_book():
+    def open_add_book_window(self, event=None):
+        def mark_all_required_empty_fields():
+            count = 1
+            for widget in add_book_window.winfo_children():
+                if isinstance(widget, ctk.CTkEntry) and not widget.get():
+                    widget.configure(border_color="red")
+                    count += 1
+
+                if count == 3:
+                    break
+
+        def mark_single_entry(entry):
+            entry.configure(border_color="red")
+
+        def add_book(event=None):
             title = entry_for_title.get().strip()
             author = entry_for_author.get().strip()
             genre = entry_for_genre.get().strip()
@@ -932,16 +991,17 @@ class BookWormApp(ctk.CTk):
                     messagebox.showinfo("Successfully added", f'"{title}" added successfully to library!')
                     self.make_empty_entries(add_book_window)
             except EmptyFieldError:
-                messagebox.showerror("Empty Field Error!", "Not all required fields are filled in!")
-            except ValueError:
-                messagebox.showerror("Invalid Year Error!", "The year must be an integer number!")
-            except NegativeYearError:
-                messagebox.showerror("Negative Year Error!", "The year must be positive!")
+                mark_all_required_empty_fields()
+            except (ValueError, NegativeYearError):
+                mark_single_entry(entry_for_year)
+                messagebox.showerror("Invalid Year Error!", "The year must be a positive integer number!")
             except sqlalchemy.exc.IntegrityError:
+                mark_single_entry(entry_for_isbn)
                 messagebox.showerror("ISBN already used!", f"{isbn} ISBN is already used!")
 
         add_book_window = ctk.CTkToplevel()
         add_book_window.title("Add book to library")
+        add_book_window.bind("<Return>", add_book)
 
         width = 440
         height = 495
@@ -1003,7 +1063,7 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-
+        entry_for_title.bind("<Down>", self.move_on_next_entry)
         entry_for_title.focus_set()
 
         author_label = ctk.CTkLabel(
@@ -1028,6 +1088,8 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
+        entry_for_author.bind("<Down>", self.move_on_next_entry)
+        entry_for_author.bind("<Up>", self.move_on_previous_entry)
 
         genre_label = ctk.CTkLabel(
             add_book_window,
@@ -1051,6 +1113,8 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
+        entry_for_genre.bind("<Down>", self.move_on_next_entry)
+        entry_for_genre.bind("<Up>", self.move_on_previous_entry)
 
         optional_field_label = ctk.CTkLabel(
             add_book_window,
@@ -1087,6 +1151,8 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
+        entry_for_description.bind("<Down>", self.move_on_next_entry)
+        entry_for_description.bind("<Up>", self.move_on_previous_entry)
 
         year_label = ctk.CTkLabel(
             add_book_window,
@@ -1111,6 +1177,8 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
+        entry_for_year.bind("<Down>", self.move_on_next_entry)
+        entry_for_year.bind("<Up>", self.move_on_previous_entry)
 
         isbn_label = ctk.CTkLabel(
             add_book_window,
@@ -1134,6 +1202,7 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
+        entry_for_isbn.bind("<Up>", self.move_on_previous_entry)
 
         add_book_button = ctk.CTkButton(
             add_book_window,
@@ -1149,7 +1218,7 @@ class BookWormApp(ctk.CTk):
         )
 
     @staticmethod
-    def open_statistics_window():
+    def open_statistics_window(event=None):
         statistics_window = ctk.CTkToplevel()
 
         statistics_window.title("Statistics")
@@ -1212,8 +1281,8 @@ class BookWormApp(ctk.CTk):
         read_unread_progress_bar = ctk.CTkProgressBar(
             statistics_window,
             orientation="horizontal",
-            fg_color="red",
-            progress_color="grey",
+            fg_color="gray",
+            progress_color="green",
         )
         read_unread_progress_bar.pack(
             pady=5
@@ -1259,6 +1328,19 @@ class BookWormApp(ctk.CTk):
         books_added_in_the_past_month_label.pack(
             pady=padding_y
         )
+
+    def on_search_enter(self, event=None):
+        self.search_book()
+
+    @staticmethod
+    def move_on_next_entry(event):
+        event.widget.tk_focusNext().focus()
+        return "break"
+
+    @staticmethod
+    def move_on_previous_entry(event=None):
+        event.widget.tk_focusPrev().focus()
+        return "break"
 
     def close_window(self, event=None):
         answer = messagebox.askyesno("Are you sure?", "Are you sure you want ot quit BookWorm?")
