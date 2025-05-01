@@ -244,6 +244,35 @@ class BookWormApp(ctk.CTk):
 
         return entries
 
+    @staticmethod
+    def add_entry_and_entry(master, row, text_of_label, width, placeholder=None):
+        label = ctk.CTkLabel(
+            master,
+            text=text_of_label
+        )
+        label.grid(
+            column=0,
+            row=row,
+            pady=10,
+            padx=10,
+            sticky="e"
+        )
+
+        entry = ctk.CTkEntry(
+            master,
+            width=width,
+            placeholder_text=placeholder or "",
+            justify="center"
+        )
+        entry.grid(
+            row=row,
+            column=1,
+            sticky="w"
+        )
+
+        return entry
+
+
     def bind_arrow_keys_to_entry(self, window: ctk.CTkToplevel):
         entries = self.get_all_entries(window)
 
@@ -317,7 +346,7 @@ class BookWormApp(ctk.CTk):
 
                 messagebox.showinfo("Successful deletion!", f'"{title}" was deleted successfully!')
 
-    def edit_book(self, title_of_book):
+    def edit_book(self, book):
         def update_book(event=None):
             new_title = title_entry.get().strip()
             new_author = author_entry.get().strip()
@@ -355,6 +384,8 @@ class BookWormApp(ctk.CTk):
                 messagebox.showerror("ISBN already used", f"{new_isbn} is already used!")
 
 
+        title_of_book = book.title
+
         edit_window = ctk.CTkToplevel()
 
         width = 400
@@ -366,7 +397,7 @@ class BookWormApp(ctk.CTk):
 
         edit_window.columnconfigure((0, 1), weight=1)
 
-        place_holder_text = "leave blank if no edit is needed"
+        placeholder_text = "leave blank if no edit is needed"
         width_of_entries = 220
 
         # Label that will show up at the top
@@ -382,149 +413,53 @@ class BookWormApp(ctk.CTk):
             sticky="n",
             pady=(20, 10))
 
-        title_label = ctk.CTkLabel(
+        title_entry = self.add_entry_and_entry(
             edit_window,
-            text="Title:"
-        )
-        title_label.grid(
-            row=1,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
-        )
-
-        title_entry = ctk.CTkEntry(
-            edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        title_entry.grid(
-            row=1,
-            column=1,
-            sticky="w"
-        )
+            1,
+            "Title:",
+            width_of_entries,
+            placeholder_text)
         title_entry.focus_set()
 
-        author_label = ctk.CTkLabel(
+
+        author_entry = self.add_entry_and_entry(
             edit_window,
-            text="Author:"
-        )
-        author_label.grid(
-            row=2,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
+            2,
+            "Author:",
+            width_of_entries,
+            placeholder_text
         )
 
-        author_entry = ctk.CTkEntry(
+        genre_entry = self.add_entry_and_entry(
             edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        author_entry.grid(
-            row=2,
-            column=1,
-            sticky="w"
+            3,
+            "Genre:",
+            width_of_entries,
+            placeholder_text
         )
 
-        genre_label = ctk.CTkLabel(
+        description_entry = self.add_entry_and_entry(
             edit_window,
-            text="Genre:"
-        )
-        genre_label.grid(
-            row=3,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
+            4,
+            "Description:",
+            width_of_entries,
+            placeholder_text
         )
 
-        genre_entry = ctk.CTkEntry(
+        year_entry = self.add_entry_and_entry(
             edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        genre_entry.grid(
-            row=3,
-            column=1,
-            sticky="w"
+            5,
+            "Year:",
+            width_of_entries,
+            placeholder_text
         )
 
-        description_label = ctk.CTkLabel(
+        isbn_entry = self.add_entry_and_entry(
             edit_window,
-            text="Description:"
-        )
-        description_label.grid(
-            row=4,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
-        )
-
-        description_entry = ctk.CTkEntry(
-            edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        description_entry.grid(
-            row=4,
-            column=1,
-            sticky="w"
-        )
-
-        year_label = ctk.CTkLabel(
-            edit_window,
-            text="Year:"
-        )
-        year_label.grid(
-            row=5,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
-        )
-
-        year_entry = ctk.CTkEntry(
-            edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        year_entry.grid(
-            row=5,
-            column=1,
-            sticky="w"
-        )
-
-        isbn_label = ctk.CTkLabel(
-            edit_window,
-            text="ISBN:"
-        )
-        isbn_label.grid(
-            row=6,
-            column=0,
-            pady=10,
-            padx=10,
-            sticky="e"
-        )
-
-        isbn_entry = ctk.CTkEntry(
-            edit_window,
-            width=width_of_entries,
-            placeholder_text=place_holder_text,
-            justify="center"
-        )
-        isbn_entry.grid(
-            row=6,
-            column=1,
-            sticky="w"
+            6,
+            "ISBN:",
+            width_of_entries,
+            placeholder_text
         )
 
         edit_button = ctk.CTkButton(
@@ -723,7 +658,7 @@ class BookWormApp(ctk.CTk):
 
             edit_button = ctk.CTkButton(
                 self.scrollable_frame_books,
-                command=lambda b=book: self.edit_book(b.title),
+                command=lambda b=book: self.edit_book(b),
                 text="Edit",
                 width=width_for_buttons,
             )
@@ -806,7 +741,7 @@ class BookWormApp(ctk.CTk):
 
         add_book_window.columnconfigure((0, 1), weight=1)
 
-        padding = 10
+        width_of_entries = 220
 
         add_book_label = ctk.CTkLabel(
             add_book_window,
@@ -834,74 +769,26 @@ class BookWormApp(ctk.CTk):
             pady=(0, 10)
         )
 
-        title_label = ctk.CTkLabel(
+        entry_for_title = self.add_entry_and_entry(
             add_book_window,
-            text="Title:"
-        )
-        title_label.grid(
-            row=2,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
-        )
-
-        entry_for_title = ctk.CTkEntry(
-            add_book_window,
-        )
-        entry_for_title.grid(
-            row=2,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
+            2,
+            "Title:",
+            width_of_entries
         )
         entry_for_title.focus_set()
 
-        author_label = ctk.CTkLabel(
+        entry_for_author = self.add_entry_and_entry(
             add_book_window,
-            text="Author:"
-        )
-        author_label.grid(
-            row=3,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
+            3,
+            "Author:",
+            width_of_entries
         )
 
-        entry_for_author = ctk.CTkEntry(
+        entry_for_genre = self.add_entry_and_entry(
             add_book_window,
-        )
-        entry_for_author.grid(
-            row=3,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
-        )
-
-        genre_label = ctk.CTkLabel(
-            add_book_window,
-            text="Genre:"
-        )
-        genre_label.grid(
-            row=4,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
-        )
-
-        entry_for_genre = ctk.CTkEntry(
-            add_book_window,
-        )
-        entry_for_genre.grid(
-            row=4,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
+            4,
+            "Genre:",
+            width_of_entries
         )
 
         optional_field_label = ctk.CTkLabel(
@@ -917,74 +804,26 @@ class BookWormApp(ctk.CTk):
             pady=(10, 10)
         )
 
-        description_label = ctk.CTkLabel(
+        entry_for_description = self.add_entry_and_entry(
             add_book_window,
-            text="Description:"
-        )
-        description_label.grid(
-            row=6,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
+            6,
+            "Description:",
+            width_of_entries
         )
 
-        entry_for_description = ctk.CTkEntry(
+        entry_for_year = self.add_entry_and_entry(
             add_book_window,
-        )
-        entry_for_description.grid(
-            row=6,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
+            7,
+            "Year:",
+            width_of_entries,
+            "e.g. 2025"
         )
 
-        year_label = ctk.CTkLabel(
+        entry_for_isbn = self.add_entry_and_entry(
             add_book_window,
-            text="Year:"
-        )
-        year_label.grid(
-            row=7,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
-        )
-
-        entry_for_year = ctk.CTkEntry(
-            add_book_window,
-            placeholder_text="e.g. 2025"
-        )
-        entry_for_year.grid(
-            row=7,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
-        )
-
-        isbn_label = ctk.CTkLabel(
-            add_book_window,
-            text="ISBN:"
-        )
-        isbn_label.grid(
-            row=8,
-            column=0,
-            padx=padding,
-            pady=padding,
-            sticky="e"
-        )
-
-        entry_for_isbn = ctk.CTkEntry(
-            add_book_window,
-        )
-        entry_for_isbn.grid(
-            row=8,
-            column=1,
-            padx=padding,
-            pady=padding,
-            sticky="w"
+            8,
+            "ISBN:",
+            width_of_entries
         )
 
         add_book_button = ctk.CTkButton(
