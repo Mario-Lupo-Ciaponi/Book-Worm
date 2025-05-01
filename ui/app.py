@@ -1,243 +1,15 @@
 import sqlalchemy.exc
-from sqlalchemy import insert, select, delete, update, func
+from sqlalchemy import func
 from sqlalchemy.orm import sessionmaker
 import customtkinter as ctk
 from tkinter import messagebox
-from datetime import datetime, timedelta
 
-from models import engine, Book
-from exceptions import EmptyFieldError, NegativeYearError, BookDoesNotExistError
+from db.models import engine, Book
+from db.repo import Repo
 
+from exceptions import EmptyFieldError, NegativeYearError
 
 Session = sessionmaker(bind=engine)
-
-
-class Repo:
-    def __init__(self, session: Session):
-        self.session: Session = session
-
-    def add_book(
-        self,
-        title: str,
-        author: str,
-        genre: str,
-        description: str=None,
-        year: int=None,
-        isbn: str=None,
-    ):
-        """
-            Inserts records into the table books
-
-            Query:
-            INSERT INTO
-                books(title, author, genre, description, year, isbn)
-            VALUES
-                (
-                *title given*,
-                *author given*,
-                *genre given*,
-                *description given(if needed*,
-                *year given(if needed)*,
-                *isbn given(if needed)*
-                );
-        """
-        stmt = insert(Book).values(
-            title=title,
-            author=author,
-            genre=genre,
-            description=description,
-            year=year,
-            isbn=isbn,
-        )
-
-        self.session.execute(stmt)
-        self.session.commit()
-
-    def get_all_genres(self):
-        stmt = select(Book.genre).distinct(Book.genre)
-
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def filter_by_genre(self, genre):
-        stmt = select(Book).where(Book.genre == genre)
-
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_all_books(self):
-        """
-            Gets all records from the books table
-
-            Query:
-            SELECT * FROM books;
-        """
-        stmt = select(Book)
-
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_book_by_title(self, title: str):
-        """
-            SELECT
-                *
-            FROM
-                books
-            WHERE
-                title = {title}
-            LIMIT
-                1;
-        """
-        stmt = select(Book).where(Book.title == title).limit(1)
-        result = self.session.execute(stmt)
-
-        return result.scalars().first()
-
-    def get_books_by_title_contain(self, title: str):
-        stmt = select(Book).where(Book.title.ilike(f"%{title}%"))
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_books_by_author_contain(self, author: str):
-        stmt = select(Book).where(Book.author.ilike(f"%{author}%"))
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_books_by_year(self, year: int):
-        stmt = select(Book).where(Book.year == year)
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_books_by_genre_contain(self, genre: str):
-        stmt = select(Book).where(Book.genre.ilike(f"%{genre}%"))
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_books_by_description_contain(self, description: str):
-        stmt = select(Book).where(Book.description.ilike(f"%{description}%"))
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def get_books_by_isbn_contain(self, isbn: str):
-        stmt = select(Book).where(Book.isbn.ilike(f"%{isbn}%"))
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-
-    def oldest_book(self):
-        stmt = select(Book.title).order_by(Book.year).limit(1)
-        result = self.session.execute(stmt)
-
-        return result.scalars().first()
-
-    def newest_book(self):
-        stmt = select(Book.title).order_by(Book.year.desc()).limit(1)
-        result = self.session.execute(stmt)
-
-        return result.scalars().first()
-
-    def get_books_count(self):
-        stmt = select(func.count(Book.id))
-
-        count = self.session.scalar(stmt)
-        return count
-
-    def get_read_and_unread_count(self):
-        read_count_stmt = select(func.count(Book.id)).where(Book.is_read==True)
-        unread_count_stmt = select(func.count(Book.id)).where(Book.is_read == False)
-
-        read_count = self.session.scalar(read_count_stmt)
-        unread_count = self.session.scalar(unread_count_stmt)
-
-        return read_count, unread_count
-
-    def get_books_count_added_in_the_past_month(self):
-        today = datetime.now()
-        one_month_ago = today - timedelta(days=30)
-
-        stmt = select(func.count(Book.id)).where(Book.added_on >= one_month_ago)
-
-        result = self.session.scalar(stmt)
-
-        return result
-
-    def get_most_common_genre(self):
-        stmt = (select(Book.genre, func.count(Book.id).label("count_of_genre"))
-                .group_by(Book.genre)
-                .order_by("count_of_genre")
-                .limit(1))
-
-        result = self.session.execute(stmt)
-
-        return result.scalars().first()
-
-    def get_average_publication_year(self):
-        stmt = select(func.avg(Book.year))
-
-        avg_publication_year = self.session.scalar(stmt)
-
-        return avg_publication_year
-
-    def order_by_year(self, ascending):
-        stmt = select(Book).order_by(Book.year.asc()) if ascending else select(Book).order_by(Book.year.desc())
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def order_by_title(self, ascending):
-        stmt = select(Book).order_by(Book.title.asc()) if ascending else select(Book).order_by(Book.title.desc())
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def order_by_author(self, ascending):
-        stmt = select(Book).order_by(Book.author.asc()) if ascending else select(Book).order_by(Book.author.desc())
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def order_by_added_on(self, ascending):
-        stmt = select(Book).order_by(Book.added_on.asc()) if ascending else select(Book).order_by(Book.added_on.desc())
-        result = self.session.execute(stmt)
-
-        return result.scalars().all()
-
-    def update_book(self, old_title, new_title, new_author, new_genre, new_description, new_year, new_isbn):
-        stmt = (update(Book)
-                .where(Book.title == old_title)
-                .values(
-                    title=new_title if new_title else Book.title,
-                    author=new_author if new_author else Book.author,
-                    genre=new_genre if new_genre else Book.genre,
-                    description=new_description if new_description else Book.description,
-                    year=new_year if new_year else Book.year,
-                    isbn=new_isbn if new_isbn else Book.isbn
-        ))
-        self.session.execute(stmt)
-        self.session.commit()
-
-    def update_book_read_status(self, book):
-        stmt = update(Book).where(Book.id == book.id).values(is_read=True if not book.is_read else False)
-        self.session.execute(stmt)
-        self.session.commit()
-
-
-    def delete_book_by_title(self, title: str):
-        stmt = delete(Book).where(Book.title == title)
-
-        self.session.execute(stmt)
-        self.session.commit()
-
-# ------ ^ Repo class
 
 
 class BookWormApp(ctk.CTk):
@@ -463,6 +235,25 @@ class BookWormApp(ctk.CTk):
                 widget.delete(0, len(widget.get()))
 
     @staticmethod
+    def get_all_entries(window: ctk.CTkToplevel):
+        entries = []
+
+        for widget in window.winfo_children():
+            if isinstance(widget, ctk.CTkEntry):
+                entries.append(widget)
+
+        return entries
+
+    def bind_arrow_keys_to_entry(self, window: ctk.CTkToplevel):
+        entries = self.get_all_entries(window)
+
+        for i, entry in enumerate(entries):
+            if i > 0:
+                entry.bind("<Up>", self.move_on_previous_entry)
+            if i < len(entries) - 1:
+                entry.bind("<Down>", self.move_on_next_entry)
+
+    @staticmethod
     def check_if_book_exists_by_title(title: str):
         with Session() as session:
             repo = Repo(session)
@@ -614,7 +405,7 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        title_entry.bind("<Down>", self.move_on_next_entry)
+        title_entry.focus_set()
 
         author_label = ctk.CTkLabel(
             edit_window,
@@ -639,8 +430,6 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        author_entry.bind("<Down>", self.move_on_next_entry)
-        author_entry.bind("<Up>", self.move_on_previous_entry)
 
         genre_label = ctk.CTkLabel(
             edit_window,
@@ -665,8 +454,6 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        genre_entry.bind("<Down>", self.move_on_next_entry)
-        genre_entry.bind("<Up>", self.move_on_previous_entry)
 
         description_label = ctk.CTkLabel(
             edit_window,
@@ -691,8 +478,6 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        description_entry.bind("<Down>", self.move_on_next_entry)
-        description_entry.bind("<Up>", self.move_on_previous_entry)
 
         year_label = ctk.CTkLabel(
             edit_window,
@@ -717,8 +502,6 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        year_entry.bind("<Down>", self.move_on_next_entry)
-        year_entry.bind("<Up>", self.move_on_previous_entry)
 
         isbn_label = ctk.CTkLabel(
             edit_window,
@@ -743,7 +526,6 @@ class BookWormApp(ctk.CTk):
             column=1,
             sticky="w"
         )
-        isbn_entry.bind("<Up>", self.move_on_previous_entry)
 
         edit_button = ctk.CTkButton(
             edit_window,
@@ -757,6 +539,8 @@ class BookWormApp(ctk.CTk):
             pady=20,
             sticky="s"
         )
+
+        self.bind_arrow_keys_to_entry(edit_window)
 
     def change_book_read_status(self, book):
         with Session() as session:
@@ -893,8 +677,6 @@ class BookWormApp(ctk.CTk):
             pady=padding
         )
 
-
-
     def add_books_to_scrollable_frame(self, books: Book):
         self.remove_book_from_scrollable_frame()
 
@@ -956,7 +738,6 @@ class BookWormApp(ctk.CTk):
             )
             delete_button.pack(pady=(5, 15))
 
-
     def open_add_book_window(self, event=None):
         def mark_all_required_empty_fields():
             count = 1
@@ -1008,10 +789,8 @@ class BookWormApp(ctk.CTk):
                 mark_all_required_empty_fields()
             except (ValueError, NegativeYearError):
                 mark_single_entry(entry_for_year)
-                messagebox.showerror("Invalid Year Error!", "The year must be a positive integer number!")
             except sqlalchemy.exc.IntegrityError:
                 mark_single_entry(entry_for_isbn)
-                messagebox.showerror("ISBN already used!", f"{isbn} ISBN is already used!")
 
         add_book_window = ctk.CTkToplevel()
         add_book_window.title("Add book to library")
@@ -1077,7 +856,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_title.bind("<Down>", self.move_on_next_entry)
         entry_for_title.focus_set()
 
         author_label = ctk.CTkLabel(
@@ -1102,8 +880,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_author.bind("<Down>", self.move_on_next_entry)
-        entry_for_author.bind("<Up>", self.move_on_previous_entry)
 
         genre_label = ctk.CTkLabel(
             add_book_window,
@@ -1127,8 +903,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_genre.bind("<Down>", self.move_on_next_entry)
-        entry_for_genre.bind("<Up>", self.move_on_previous_entry)
 
         optional_field_label = ctk.CTkLabel(
             add_book_window,
@@ -1165,8 +939,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_description.bind("<Down>", self.move_on_next_entry)
-        entry_for_description.bind("<Up>", self.move_on_previous_entry)
 
         year_label = ctk.CTkLabel(
             add_book_window,
@@ -1191,8 +963,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_year.bind("<Down>", self.move_on_next_entry)
-        entry_for_year.bind("<Up>", self.move_on_previous_entry)
 
         isbn_label = ctk.CTkLabel(
             add_book_window,
@@ -1216,7 +986,6 @@ class BookWormApp(ctk.CTk):
             pady=padding,
             sticky="w"
         )
-        entry_for_isbn.bind("<Up>", self.move_on_previous_entry)
 
         add_book_button = ctk.CTkButton(
             add_book_window,
@@ -1230,6 +999,8 @@ class BookWormApp(ctk.CTk):
             pady=20,
             sticky="s"
         )
+
+        self.bind_arrow_keys_to_entry(add_book_window)
 
     @staticmethod
     def open_statistics_window(event=None):
@@ -1361,12 +1132,3 @@ class BookWormApp(ctk.CTk):
 
         if answer:
             self.destroy()
-
-
-def main():
-    book_worm_app = BookWormApp()
-    book_worm_app.mainloop()
-
-
-if __name__ == "__main__":
-    main()
