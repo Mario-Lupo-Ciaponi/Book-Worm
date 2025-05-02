@@ -40,17 +40,16 @@ class BookWormApp(ctk.CTk):
         self.order_option = ctk.StringVar(value="No order")
 
         # Label that will show up at the top
-        self.book_worm_label = ctk.CTkLabel(
+
+        self.book_worm_label = self.add_header_label(
             self,
-            text="📚BookWorm - Your Personal Library",
-            font=("Segoe UI", 20, "bold")
+            0,
+            "📚BookWorm - Your Personal Library",
+            20,
+            3,
+            20,
+            18
         )
-        self.book_worm_label.grid(
-            row=0,
-            column=0,
-            columnspan=3,
-            sticky="n",
-            pady=(20, 10))
 
         self.label_for_search = ctk.CTkLabel(
             self,
@@ -114,17 +113,14 @@ class BookWormApp(ctk.CTk):
             pady=(20, 10),
         )
 
-        self.label_for_booklist = ctk.CTkLabel(
+        self.label_for_booklist = self.add_header_label(
             self,
-            text="Booklist:",
-            font=("Segoe UI", 17, "bold")
-        )
-        self.label_for_booklist.grid(
-            row=4,
-            column=0,
-            columnspan=3,
-            sticky="n",
-            pady=(20, 0)
+            4,
+            "Booklist:",
+            17,
+            3,
+            20,
+            0
         )
 
         self.scrollable_frame_books = ctk.CTkScrollableFrame(
@@ -243,6 +239,22 @@ class BookWormApp(ctk.CTk):
                 entries.append(widget)
 
         return entries
+
+    @staticmethod
+    def add_header_label(master, row, text_of_label, font_size, columnspan, upper_pady, lower_pady):
+        label = ctk.CTkLabel(
+            master,
+            text=text_of_label,
+            font=("Segoe UI", font_size, "bold")
+        )
+        label.grid(
+            row=row,
+            column=0,
+            columnspan=columnspan,
+            sticky="n",
+            pady=(upper_pady, lower_pady))
+
+        return label
 
     @staticmethod
     def add_entry_and_entry(master, row, text_of_label, width, placeholder=None):
@@ -366,7 +378,7 @@ class BookWormApp(ctk.CTk):
                     repo = Repo(session)
 
                     repo.update_book(
-                        title_of_book,
+                        book.id,
                         new_title,
                         new_author,
                         new_genre,
@@ -400,18 +412,15 @@ class BookWormApp(ctk.CTk):
         placeholder_text = "leave blank if no edit is needed"
         width_of_entries = 220
 
-        # Label that will show up at the top
-        edit_label = ctk.CTkLabel(
+        edit_label = self.add_header_label(
             edit_window,
-            text=f'Edit - "{title_of_book}"',
-            font=("Segoe UI", 20, "bold")
+            0,
+            f'Edit - "{title_of_book}"',
+            20,
+            2,
+            20,
+            10
         )
-        edit_label.grid(
-            row=0,
-            column=0,
-            columnspan=2,
-            sticky="n",
-            pady=(20, 10))
 
         title_entry = self.add_entry_and_entry(
             edit_window,
@@ -743,17 +752,14 @@ class BookWormApp(ctk.CTk):
 
         width_of_entries = 220
 
-        add_book_label = ctk.CTkLabel(
+        add_book_label = self.add_header_label(
             add_book_window,
-            text="Add New Book:",
-            font=("Segoe UI", 20, "bold")
-        )
-        add_book_label.grid(
-            row=0,
-            column=0,
-            columnspan=2,
-            sticky="n",
-            pady=(20, 10)
+            0,
+            "Add New Book:",
+            20,
+            2,
+            20,
+            10
         )
 
         required_field_label = ctk.CTkLabel(

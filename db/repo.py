@@ -205,7 +205,7 @@ class Repo:
 
         return result.scalars().all()
 
-    def update_book(self, old_title, new_title, new_author, new_genre, new_description, new_year, new_isbn):
+    def update_book(self, id, new_title, new_author, new_genre, new_description, new_year, new_isbn):
         values = {}
         if new_title: values["title"] = new_title
         if new_author: values["author"] = new_author
@@ -215,7 +215,7 @@ class Repo:
         if new_isbn: values["isbn"] = new_isbn
 
         stmt = (update(Book)
-                .where(Book.title == old_title)
+                .where(Book.id == id)
                 .values(
                     **values
         ))
